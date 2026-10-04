@@ -1,7 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
 import {
-  Chip,
-  ChipStyle,
   IconImage,
   Page,
   Panel,
@@ -337,13 +335,19 @@ export function CluePage() {
 
             {playing && card && (
               <>
-                <Chip
-                  text={`Team ${state.currentTeam} describes`}
-                  chipStyle={ChipStyle.EMPHASIZED}
-                />
+                {/* One compact status line (team + progress) and a smaller
+                    timer: the word, don't-say words, and hint must all fit
+                    without scrolling, so the header earns two lines total. */}
                 <TextView
                   as="p"
-                  textStyle={TextStyle.NUMERAL2}
+                  textStyle={TextStyle.LABEL_EMPHASIZED}
+                  textColor={TextColor.SECONDARY}>
+                  Team {state.currentTeam} describes · Clue {state.clueIndex + 1}{' '}
+                  of {state.order.length}
+                </TextView>
+                <TextView
+                  as="p"
+                  textStyle={TextStyle.HEADING2}
                   textColor={lowTime ? TextColor.ACCENT : TextColor.PRIMARY}>
                   {formatCountdown(state.remainingSeconds)}
                 </TextView>
@@ -363,7 +367,12 @@ export function CluePage() {
                   </TextView>
                 )}
                 {flash && (
-                  <Chip text={flash.text} chipStyle={ChipStyle.ELEVATED} />
+                  <TextView
+                    as="p"
+                    textStyle={TextStyle.LABEL_EMPHASIZED}
+                    textColor={TextColor.ACCENT}>
+                    {flash.text}
+                  </TextView>
                 )}
                 {streak >= 2 && (
                   <TextView
@@ -376,12 +385,6 @@ export function CluePage() {
                 <Eyebrow>{card.category}</Eyebrow>
                 <TextView as="p" textStyle={TextStyle.HEADING1}>
                   {card.word}
-                </TextView>
-                <TextView
-                  as="p"
-                  textStyle={TextStyle.BODY2}
-                  textColor={TextColor.SECONDARY}>
-                  Clue {state.clueIndex + 1} of {state.order.length}
                 </TextView>
                 {card.forbiddenWords.length > 0 && (
                   <>
