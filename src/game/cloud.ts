@@ -18,10 +18,13 @@ import {isTickOnly, type GameState} from './state';
 
 const ROOM_KEY = 'gwis.room';
 const DEFAULT_ROOM = 'primary';
-/** Poll cadence while a round is running. */
+/**
+ * Poll cadence, running or idle alike. Reads are cheap direct fetches of one
+ * small key (no billable list calls since the stable-key change), so an idle
+ * tab sipping every 2.5s costs essentially nothing -- and the describer never
+ * stares at a stale screen for 10s after the teacher hits Start.
+ */
 const POLL_MS = 2500;
-/** Poll cadence when nothing is happening (idle / paused / complete). */
-const IDLE_POLL_MS = 10000;
 const STALE_MS = 8000;
 /** Snapshots older than this are never a live game; ignore on first sight. */
 const MAX_SNAPSHOT_AGE = 2 * 60 * 60 * 1000;
@@ -198,12 +201,6 @@ function stopPolling() {
   setConnected(false);
 }
 
-/** Cadence follows the game: fast while a round runs, slow otherwise, so an
- *  idle open tab sips instead of chugging Blob operations. */
-function pollDelay(): number {
-  return getGameState().phase === 'running' ? POLL_MS : IDLE_POLL_MS;
-}
-
 function startPolling(
   room: string,
   onRemoteState: (state: GameState) => void,
@@ -213,7 +210,7 @@ function startPolling(
     if (pollTimer === null) return;
     void pollOnce(room, onRemoteState).finally(() => {
       if (pollTimer !== null) {
-        pollTimer = window.setTimeout(tick, pollDelay());
+        pollTimer = window.setTimeout(tick, POLL_MS);
       }
     });
   };
