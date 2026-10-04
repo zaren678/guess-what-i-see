@@ -90,6 +90,9 @@ export async function POST(req: Request): Promise<Response> {
   await put(keyOf(room), JSON.stringify(snap), {
     access: 'public',
     addRandomSuffix: false,
+    // Overwriting the stable key requires this; without it the first write
+    // succeeds and every later write throws.
+    allowOverwrite: true,
     contentType: 'application/json',
     cacheControlMaxAge: 0,
   });
