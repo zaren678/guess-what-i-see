@@ -58,12 +58,22 @@ export function toRelayCommand(action: PublicAction): RelayCommand | null {
   }
 }
 
+function newStartId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 function toGameAction(action: PublicAction, state: GameState): GameAction | null {
   switch (action.type) {
     case 'start': {
+      // Starting while starting begins at once (begin-anyway fallback).
+      if (state.phase === 'starting') return {type: 'BEGIN_ROUND'};
       const deck = getDeck(state.deckId ?? undefined);
       if (!deck) return null;
-      return {type: 'START_ROUND', order: shuffledOrder(deck.cards.length)};
+      return {
+        type: 'START_ROUND',
+        order: shuffledOrder(deck.cards.length),
+        startId: newStartId(),
+      };
     }
     case 'pause':
       return {type: 'PAUSE'};

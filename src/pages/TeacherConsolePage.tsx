@@ -12,6 +12,8 @@ function phaseLabel(phase: RoundPhase): string {
   switch (phase) {
     case 'idle':
       return 'Ready';
+    case 'starting':
+      return 'Starting';
     case 'running':
       return 'Running';
     case 'paused':
@@ -49,11 +51,15 @@ export function TeacherConsolePage() {
       : phase === 'paused'
         ? {type: 'resume'}
         : {type: 'start'};
+  // While starting, Start means "begin now" (the fallback when the
+  // glasses never acked).
   const startPauseLabel = running
     ? 'Pause'
     : phase === 'paused'
       ? 'Resume'
-      : 'Start';
+      : phase === 'starting'
+        ? 'Begin now'
+        : 'Start';
 
   // Keyboard driving: G = got it, S = skip, Space = start/pause/resume,
   // N/P = next/previous clue. Ignored when typing in a field.
@@ -146,7 +152,18 @@ export function TeacherConsolePage() {
               Switch team
             </button>
           </div>
-          {playing && card ? (
+          {phase === 'starting' && deck ? (
+            <>
+              <div className="tcon-eyebrow">Starting</div>
+              <div className="tcon-word tcon-word--small">
+                Waiting for glasses…
+              </div>
+              <div className="tcon-meta">
+                The clock starts when the glasses confirm the word is on
+                screen. Press Begin now (Space) to start without waiting.
+              </div>
+            </>
+          ) : playing && card ? (
             <>
               <div className="tcon-eyebrow">Current clue</div>
               <div className="tcon-word">{card.word}</div>

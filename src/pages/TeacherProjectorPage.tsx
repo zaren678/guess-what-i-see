@@ -64,7 +64,9 @@ export function TeacherProjectorPage() {
         ? {title: 'Resume', action: {type: 'resume'}, toast: 'Round going'}
         : phase === 'complete'
           ? {title: 'Play again', action: {type: 'start'}, toast: 'Round started'}
-          : {title: 'Start round', action: {type: 'start'}, toast: 'Round started'};
+          : phase === 'starting'
+            ? {title: 'Begin now', action: {type: 'start'}, toast: 'Round started'}
+            : {title: 'Start round', action: {type: 'start'}, toast: 'Round started'};
 
   return (
     <Page headerText="Projector" enableSystemBarInset={false}>

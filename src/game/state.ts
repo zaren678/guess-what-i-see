@@ -1,7 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {ROUND_SECONDS} from '../domain';
 
-export type RoundPhase = 'idle' | 'running' | 'paused' | 'complete';
+export type RoundPhase =
+  | 'idle'
+  | 'starting'
+  | 'running'
+  | 'paused'
+  | 'complete';
 export type Team = 'A' | 'B';
 
 export type GameState = {
@@ -17,6 +22,14 @@ export type GameState = {
   currentTeam: Team;
   /** Teacher-side reveal of the secret word. */
   revealed: boolean;
+  /**
+   * Handshake nonce for the current start. The teacher sets it on Start; the
+   * glasses echoes it back in `ackedId` once the word is on screen; only
+   * then does the teacher begin the clock. Empty when no start is pending.
+   */
+  startId: string;
+  /** Last start nonce the glasses confirmed rendering. */
+  ackedId: string;
 };
 
 /** Runtime shape check for snapshots arriving over the cloud link or the
@@ -36,6 +49,7 @@ export function isGameState(value: unknown): value is GameState {
     Number.isInteger(s.clueIndex) &&
     s.clueIndex >= 0 &&
     (s.phase === 'idle' ||
+      s.phase === 'starting' ||
       s.phase === 'running' ||
       s.phase === 'paused' ||
       s.phase === 'complete') &&
@@ -46,7 +60,9 @@ export function isGameState(value: unknown): value is GameState {
     typeof s.scoreB === 'number' &&
     Number.isFinite(s.scoreB) &&
     (s.currentTeam === 'A' || s.currentTeam === 'B') &&
-    typeof s.revealed === 'boolean'
+    typeof s.revealed === 'boolean' &&
+    typeof s.startId === 'string' &&
+    typeof s.ackedId === 'string'
   );
 }
 
@@ -78,11 +94,15 @@ export const initialGameState: GameState = {
   scoreB: 0,
   currentTeam: 'A',
   revealed: false,
+  startId: '',
+  ackedId: '',
 };
 
 export type GameAction =
   | {type: 'SELECT_DECK'; deckId: string; order: number[]}
-  | {type: 'START_ROUND'; order: number[]}
+  | {type: 'START_ROUND'; order: number[]; startId: string}
+  | {type: 'BEGIN_ROUND'}
+  | {type: 'SET_ACKED'; ackedId: string}
   | {type: 'PAUSE'}
   | {type: 'RESUME'}
   | {type: 'CORRECT'}
@@ -108,15 +128,52 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...initialGameState,
         deckId: action.deckId,
         order: action.order,
-      };    case 'START_ROUND':
+      };    case 'START_ROUND': {
       if (action.order.length === 0) return state;
+      // Pressing Start while starting begins immediately (the fallback when
+      // the glasses never acked).
+      if (state.phase === 'starting') {
+        return {
+          ...state,
+          phase: 'running',
+          clueIndex: 0,
+          remainingSeconds: ROUND_SECONDS,
+        };
+      }
+      // Mid-game restarts skip the handshake and run at once.
+      if (state.phase !== 'idle') {
+        return {
+          ...state,
+          order: action.order,
+          clueIndex: 0,
+          phase: 'running',
+          remainingSeconds: ROUND_SECONDS,
+          startId: action.startId,
+          ackedId: action.startId,
+        };
+      }
+      // Fresh start: hold the clock in `starting` until the glasses echoes
+      // the nonce back. The timer only ever ticks while running.
       return {
         ...state,
         order: action.order,
         clueIndex: 0,
+        phase: 'starting',
+        remainingSeconds: ROUND_SECONDS,
+        startId: action.startId,
+        ackedId: '',
+      };
+    }
+    case 'BEGIN_ROUND':
+      if (state.phase !== 'starting') return state;
+      return {
+        ...state,
         phase: 'running',
+        clueIndex: 0,
         remainingSeconds: ROUND_SECONDS,
       };
+    case 'SET_ACKED':
+      return {...state, ackedId: action.ackedId};
     case 'PAUSE':
       return state.phase === 'running' ? {...state, phase: 'paused'} : state;
     case 'RESUME':
@@ -153,6 +210,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         scoreB: 0,
         currentTeam: 'A',
         revealed: false,
+        startId: '',
+        ackedId: '',
       };
     case 'TICK': {
       if (state.phase !== 'running') return state;

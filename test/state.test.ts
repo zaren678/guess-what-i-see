@@ -33,18 +33,82 @@ test('SELECT_DECK loads the deck and resets the round', () => {
 });
 
 test('START_ROUND needs a non-empty incoming order', () => {
-  const ok = gameReducer(initialGameState, {
-    type: 'START_ROUND',
-    order: [0, 1],
-  });
-  assert.equal(ok.phase, 'running');
-  assert.equal(ok.clueIndex, 0);
-  assert.equal(ok.remainingSeconds, ROUND_SECONDS);
-
   // Guards the action's order, not the stale state's.
   const seeded = running({order: [0]});
-  const noop = gameReducer(seeded, {type: 'START_ROUND', order: []});
+  const noop = gameReducer(seeded, {
+    type: 'START_ROUND',
+    order: [],
+    startId: 'n0',
+  });
   assert.strictEqual(noop, seeded);
+});
+
+test('START_ROUND holds the clock in starting until begin', () => {
+  const starting = gameReducer(initialGameState, {
+    type: 'START_ROUND',
+    order: [0, 1],
+    startId: 'n1',
+  });
+  assert.equal(starting.phase, 'starting');
+  assert.equal(starting.startId, 'n1');
+  assert.equal(starting.ackedId, '');
+  assert.equal(starting.clueIndex, 0);
+  assert.equal(starting.remainingSeconds, ROUND_SECONDS);
+  // Frozen: ticks and scoring wait for begin.
+  assert.strictEqual(gameReducer(starting, {type: 'TICK'}), starting);
+  assert.strictEqual(gameReducer(starting, {type: 'CORRECT'}), starting);
+
+  const runningState = gameReducer(starting, {type: 'BEGIN_ROUND'});
+  assert.equal(runningState.phase, 'running');
+  assert.equal(runningState.remainingSeconds, ROUND_SECONDS);
+  assert.equal(runningState.clueIndex, 0);
+
+  // Begin anywhere else no-ops.
+  assert.strictEqual(
+    gameReducer(initialGameState, {type: 'BEGIN_ROUND'}),
+    initialGameState,
+  );
+  assert.strictEqual(gameReducer(runningState, {type: 'BEGIN_ROUND'}), runningState);
+});
+
+test('START_ROUND while starting begins at once; mid-game restarts run', () => {
+  const starting = gameReducer(initialGameState, {
+    type: 'START_ROUND',
+    order: [0, 1],
+    startId: 'n1',
+  });
+  const begun = gameReducer(starting, {
+    type: 'START_ROUND',
+    order: [0, 1],
+    startId: 'n2',
+  });
+  assert.equal(begun.phase, 'running');
+  assert.deepEqual(begun.order, [0, 1]);
+
+  const restart = gameReducer(running({order: [0]}), {
+    type: 'START_ROUND',
+    order: [1, 0],
+    startId: 'n3',
+  });
+  assert.equal(restart.phase, 'running');
+  assert.deepEqual(restart.order, [1, 0]);
+  assert.equal(restart.startId, 'n3');
+  assert.equal(restart.ackedId, 'n3');
+});
+
+test('SET_ACKED echoes the nonce; RESET clears handshake ids', () => {
+  const starting = gameReducer(initialGameState, {
+    type: 'START_ROUND',
+    order: [0],
+    startId: 'n1',
+  });
+  const acked = gameReducer(starting, {type: 'SET_ACKED', ackedId: 'n1'});
+  assert.equal(acked.ackedId, 'n1');
+  assert.equal(acked.phase, 'starting');
+
+  const reset = gameReducer(acked, {type: 'RESET_ROUND'});
+  assert.equal(reset.startId, '');
+  assert.equal(reset.ackedId, '');
 });
 
 test('CORRECT scores the describing team and advances', () => {
@@ -135,6 +199,8 @@ test('isGameState accepts good snapshots and rejects junk', () => {
     {...running(), order: [0, -1]},
     {...running(), order: [0, 1.5]},
     {...running(), clueIndex: -1},
+    {...running(), startId: 5},
+    {...running(), ackedId: null},
     {...running(), remainingSeconds: NaN},
     {...running(), scoreA: Infinity},
     {...running(), revealed: 'yes'},

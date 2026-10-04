@@ -1,4 +1,4 @@
-import {getGameState, subscribeGameState} from './store';
+import {dispatchGame, getGameState, subscribeGameState} from './store';
 import {isTickOnly, type GameState} from './state';
 
 /**
@@ -267,6 +267,34 @@ export function attachCloud(opts: {
     const next = getGameState();
     const prev = prevState;
     prevState = next;
+    // Start handshake. The glasses echoes an unacked start nonce and sends
+    // it immediately; the teacher begins the clock once the echo arrives.
+    // These run ahead of the applyingRemote guard on purpose: the ack and
+    // the begin are new moves the other side must receive.
+    if (
+      role === 'glasses' &&
+      next.phase === 'starting' &&
+      next.startId !== '' &&
+      next.ackedId !== next.startId
+    ) {
+      const sent = broadcastSeq;
+      dispatchGame({type: 'SET_ACKED', ackedId: next.startId});
+      // A local transition already broadcast via the nested subscriber pass;
+      // only send explicitly when it ran under a remote apply (suppressed).
+      if (broadcastSeq === sent) broadcast(getGameState(), room, role);
+      return;
+    }
+    if (
+      role === 'teacher' &&
+      next.phase === 'starting' &&
+      next.startId !== '' &&
+      next.ackedId === next.startId
+    ) {
+      const sent = broadcastSeq;
+      dispatchGame({type: 'BEGIN_ROUND'});
+      if (broadcastSeq === sent) broadcast(getGameState(), room, role);
+      return;
+    }
     if (!prev || applyingRemote) return;
     if (isTickOnly(prev, next)) return;
     broadcast(next, room, role);

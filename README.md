@@ -25,7 +25,11 @@ round from a laptop.
   poll every 2.5s. Malformed snapshots are rejected at the boundary, and
   broadcasts retry with backoff until the server confirms. Both screens show
   the room code (they must match to link), and the teacher console warns
-  while any move is unconfirmed.
+  while any move is unconfirmed. Starting is a handshake: the teacher's
+  Start holds the clock in `starting` until the glasses echoes the start
+  nonce (or the teacher presses Start again to begin anyway). One-shot
+  celebrations and warnings on the glasses go out as toasts, not inline
+  rows, so the word and don't-say list stay on screen.
 
 ## Decks
 

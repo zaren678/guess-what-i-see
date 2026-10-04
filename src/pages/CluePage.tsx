@@ -9,6 +9,7 @@ import {
   TextColor,
   TextStyle,
   TextView,
+  Toast,
 } from '@wearables-ui-toolkit/mrbd';
 import {
   cloudCheckOutline,
@@ -242,12 +243,12 @@ export function CluePage() {
   useEffect(() => {
     const prev = prevRef.current;
     const phaseChanged = state.phase !== prev.phase;
-    if (
-      (phaseChanged &&
-        state.phase === 'running' &&
-        (prev.phase === 'idle' || prev.phase === 'complete')) ||
-      (phaseChanged && state.phase === 'idle')
-    ) {
+    const freshStart =
+      phaseChanged &&
+      (state.phase === 'starting' ||
+        (state.phase === 'running' &&
+          (prev.phase === 'idle' || prev.phase === 'complete')));
+    if (freshStart || (phaseChanged && state.phase === 'idle')) {
       // Fresh round (or reset): streaks don't carry over.
       setStreak(0);
       setFlash(null);
@@ -305,8 +306,37 @@ export function CluePage() {
       : undefined;
   const phase = state.phase;
   const playing = phase === 'running' || phase === 'paused';
+  const previewing = phase === 'starting';
   const lowTime = state.remainingSeconds <= HURRY_SECONDS;
   const winner = winnerOf(state.scoreA, state.scoreB);
+
+  // Transient accent lines go out as toasts instead of inline rows, so the
+  // word and don't-say list never scroll off for a one-shot celebration.
+  // Each fires once per trigger (refs re-arm when the trigger clears).
+  const toastedRef = useRef({flash: null as string | null, streak: 0, hurry: false});
+  useEffect(() => {
+    if (flash && toastedRef.current.flash !== flash.text) {
+      toastedRef.current.flash = flash.text;
+      Toast.show(flash.text);
+    }
+  }, [flash]);
+  useEffect(() => {
+    if (streak >= 2 && toastedRef.current.streak !== streak) {
+      toastedRef.current.streak = streak;
+      Toast.show(`${streak} in a row — keep going!`);
+    } else if (streak < 2) {
+      toastedRef.current.streak = 0;
+    }
+  }, [streak]);
+  useEffect(() => {
+    const hurry = phase === 'running' && lowTime;
+    if (hurry && !toastedRef.current.hurry) {
+      toastedRef.current.hurry = true;
+      Toast.show('Hurry — almost out of time!');
+    } else if (!hurry) {
+      toastedRef.current.hurry = false;
+    }
+  }, [phase, lowTime]);
 
   return (
     <Page headerText="Clue" enableSystemBarInset={false}>
@@ -341,7 +371,7 @@ export function CluePage() {
               </>
             )}
 
-            {playing && card && (
+            {(playing || previewing) && card && (
               <>
                 {/* One compact status line (team + progress) and a smaller
                     timer: the word, don't-say words, and hint must all fit
@@ -366,28 +396,12 @@ export function CluePage() {
                   size={SliderBarSize.THIN}
                   animated
                 />
-                {lowTime && phase === 'running' && (
+                {previewing && (
                   <TextView
                     as="p"
                     textStyle={TextStyle.LABEL_EMPHASIZED}
                     textColor={TextColor.ACCENT}>
-                    Hurry — almost out of time!
-                  </TextView>
-                )}
-                {flash && (
-                  <TextView
-                    as="p"
-                    textStyle={TextStyle.LABEL_EMPHASIZED}
-                    textColor={TextColor.ACCENT}>
-                    {flash.text}
-                  </TextView>
-                )}
-                {streak >= 2 && (
-                  <TextView
-                    as="p"
-                    textStyle={TextStyle.LABEL_EMPHASIZED}
-                    textColor={TextColor.ACCENT}>
-                    {streak} in a row — keep going!
+                    Get ready — starting soon…
                   </TextView>
                 )}
                 <Eyebrow>{card.category}</Eyebrow>
