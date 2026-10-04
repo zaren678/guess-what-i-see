@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useSyncExternalStore} from 'react';
 import {useLocation} from 'react-router-dom';
 import {applyPublicAction, type PublicAction} from './actions';
+import {isGameState} from './state';
 import {
   attachCloud,
   getCloudSnapshot,
@@ -28,8 +29,13 @@ export function useGame() {
   useEffect(() => {
     attachCloud({
       role,
-      onRemoteState: remote =>
-        dispatchGame({type: 'APPLY_STATE', state: remote}),
+      onRemoteState: remote => {
+        // The reducer trusts dispatched actions; validate at the boundary
+        // so one malformed snapshot can't wedge the screen until reset.
+        if (isGameState(remote)) {
+          dispatchGame({type: 'APPLY_STATE', state: remote});
+        }
+      },
     });
   }, [role]);
 

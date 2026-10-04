@@ -19,6 +19,55 @@ export type GameState = {
   revealed: boolean;
 };
 
+/** Runtime shape check for snapshots arriving over the cloud link or the
+ *  relay. The reducer trusts dispatched actions; this guards the boundary
+ *  so a malformed snapshot can never wedge both screens until reset. */
+export function isGameState(value: unknown): value is GameState {
+  if (typeof value !== 'object' || value === null) return false;
+  const s = value as Record<string, unknown>;
+  return (
+    (typeof s.deckId === 'string' || s.deckId === null) &&
+    Array.isArray(s.order) &&
+    s.order.length <= 10000 &&
+    s.order.every(
+      (i: unknown) => typeof i === 'number' && Number.isInteger(i) && i >= 0,
+    ) &&
+    typeof s.clueIndex === 'number' &&
+    Number.isInteger(s.clueIndex) &&
+    s.clueIndex >= 0 &&
+    (s.phase === 'idle' ||
+      s.phase === 'running' ||
+      s.phase === 'paused' ||
+      s.phase === 'complete') &&
+    typeof s.remainingSeconds === 'number' &&
+    Number.isFinite(s.remainingSeconds) &&
+    typeof s.scoreA === 'number' &&
+    Number.isFinite(s.scoreA) &&
+    typeof s.scoreB === 'number' &&
+    Number.isFinite(s.scoreB) &&
+    (s.currentTeam === 'A' || s.currentTeam === 'B') &&
+    typeof s.revealed === 'boolean'
+  );
+}
+
+/** True when a store transition is just the 1-second round clock. The cloud
+ *  link skips these (each side ticks locally from the last synced snapshot)
+ *  so the timer alone never burns uploads. */
+export function isTickOnly(prev: GameState, next: GameState): boolean {
+  return (
+    prev.phase === 'running' &&
+    next.phase === 'running' &&
+    next.remainingSeconds === prev.remainingSeconds - 1 &&
+    prev.deckId === next.deckId &&
+    prev.clueIndex === next.clueIndex &&
+    prev.scoreA === next.scoreA &&
+    prev.scoreB === next.scoreB &&
+    prev.currentTeam === next.currentTeam &&
+    prev.revealed === next.revealed &&
+    prev.order === next.order
+  );
+}
+
 export const initialGameState: GameState = {
   deckId: null,
   order: [],
@@ -60,7 +109,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         deckId: action.deckId,
         order: action.order,
       };    case 'START_ROUND':
-      if (state.order.length === 0) return state;
+      if (action.order.length === 0) return state;
       return {
         ...state,
         order: action.order,

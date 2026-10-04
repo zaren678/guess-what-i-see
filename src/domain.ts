@@ -28,22 +28,34 @@ function isDeckJson(value: unknown): value is DeckJson {
 /** Seconds per round. Domain behavior, not a layout value. */
 export const ROUND_SECONDS = 60;
 
-const deckModules = import.meta.glob<{default?: unknown}>('../decks/*.json', {
-  eager: true,
-});
+// Vite statically bundles every decks/*.json here. Outside a Vite build
+// (e.g. node:test) import.meta.glob is unavailable, so there are simply no
+// bundled decks and DECKS is empty.
+const deckModules: Record<string, {default?: unknown}> =
+  typeof import.meta.glob === 'function'
+    ? import.meta.glob<{default?: unknown}>('../decks/*.json', {eager: true})
+    : {};
 
-function normalizeDeck(raw: unknown): Deck | null {
+export function normalizeDeck(raw: unknown): Deck | null {
   if (!isDeckJson(raw)) return null;
   if (typeof raw.id !== 'string' || typeof raw.title !== 'string') return null;
   if (!Array.isArray(raw.cards)) return null;
   const cards: Card[] = [];
+  let dropped = 0;
   for (const entry of raw.cards) {
-    if (typeof entry !== 'object' || entry === null) continue;
-    const card = entry as Record<string, unknown>;
-    if (typeof card.word !== 'string' || typeof card.category !== 'string') {
+    if (typeof entry !== 'object' || entry === null) {
+      dropped += 1;
       continue;
     }
-    if (!Array.isArray(card.forbiddenWords)) continue;
+    const card = entry as Record<string, unknown>;
+    if (typeof card.word !== 'string' || typeof card.category !== 'string') {
+      dropped += 1;
+      continue;
+    }
+    if (!Array.isArray(card.forbiddenWords)) {
+      dropped += 1;
+      continue;
+    }
     cards.push({
       word: card.word,
       category: card.category,
@@ -54,6 +66,11 @@ function normalizeDeck(raw: unknown): Deck | null {
     });
   }
   if (cards.length === 0) return null;
+  if (dropped > 0) {
+    console.warn(
+      `deck "${raw.id}" loaded with ${cards.length} cards; skipped ${dropped} invalid entr${dropped === 1 ? 'y' : 'ies'}.`,
+    );
+  }
   return {
     id: raw.id,
     title: raw.title,
@@ -72,11 +89,13 @@ export function getDeck(id: string | undefined): Deck | undefined {
   return DECKS.find(deck => deck.id === id);
 }
 
-/** Compact MM:SS countdown string. */
+/** Compact MM:SS countdown string. Non-finite input renders as 00:00. */
 export function formatCountdown(totalSeconds: number): string {
-  const clamped = Math.max(0, totalSeconds);
-  const minutes = Math.floor(clamped / 60);
-  const seconds = clamped % 60;
+  const floored = Number.isFinite(totalSeconds)
+    ? Math.max(0, Math.floor(totalSeconds))
+    : 0;
+  const minutes = Math.floor(floored / 60);
+  const seconds = floored % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 

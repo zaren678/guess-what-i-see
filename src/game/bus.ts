@@ -1,6 +1,14 @@
 import type {GameState} from './state';
 import {dispatchGame, getGameState, subscribeGameState} from './store';
 
+/**
+ * LEGACY transport: the original WebSocket relay path, superseded by the
+ * serverless cloud link (src/game/cloud.ts + api/state.ts). Nothing imports
+ * this module at runtime anymore (actions.ts takes only the RelayCommand
+ * type); it stays for the mapping tests until the relay vocabulary is
+ * retired outright.
+ */
+
 export type RelayRole = 'glasses' | 'teacher';
 
 export type RelayCommand = {

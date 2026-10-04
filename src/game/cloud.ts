@@ -1,5 +1,5 @@
 import {getGameState, subscribeGameState} from './store';
-import type {GameState} from './state';
+import {isTickOnly, type GameState} from './state';
 
 /**
  * Cloud link between the glasses web app and the teacher console.
@@ -18,7 +18,10 @@ import type {GameState} from './state';
 
 const ROOM_KEY = 'gwis.room';
 const DEFAULT_ROOM = 'primary';
+/** Poll cadence while a round is running. */
 const POLL_MS = 2500;
+/** Poll cadence when nothing is happening (idle / paused / complete). */
+const IDLE_POLL_MS = 10000;
 const STALE_MS = 8000;
 /** Snapshots older than this are never a live game; ignore on first sight. */
 const MAX_SNAPSHOT_AGE = 2 * 60 * 60 * 1000;
@@ -27,9 +30,20 @@ const MAX_SNAPSHOT_AGE = 2 * 60 * 60 * 1000;
  * the deployed site (local `vite preview` serves static files only), so the
  * cloud stays dormant on loopback and the app runs standalone there.
  */
+/** Hostnames where the same-origin /api/state function cannot exist, so the
+ *  cloud link stays dormant instead of spamming a failing endpoint. The API
+ *  only exists on the deployed site; loopback, LAN, and .local hosts are all
+ *  local dev/preview. */
+export function isLocalHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(host)) return true;
+  if (host === '0.0.0.0' || host.endsWith('.local')) return true;
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+}
+
 function cloudAvailable(): boolean {
   if (typeof window === 'undefined') return false;
-  return !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+  return !isLocalHostname(window.location.hostname);
 }
 
 export type CloudRole = 'teacher' | 'glasses';
@@ -81,6 +95,7 @@ type WirePayload = {
 
 const sessionId = Math.random().toString(36).slice(2, 10);
 let attachedRole: CloudRole | null = null;
+let attachedRoom: string | null = null;
 let cleanup: (() => void) | null = null;
 let pollTimer: number | null = null;
 let lastAt = 0;
@@ -88,35 +103,34 @@ let lastAdoptedAt = 0;
 let lastPollOkAt = 0;
 let applyingRemote = false;
 let prevState: GameState | null = null;
+/** Monotonic id so a delayed broadcast retry never overwrites a newer move. */
+let broadcastSeq = 0;
 
-function isTickOnly(prev: GameState, next: GameState): boolean {
-  return (
-    prev.phase === 'running' &&
-    next.phase === 'running' &&
-    next.remainingSeconds === prev.remainingSeconds - 1 &&
-    prev.deckId === next.deckId &&
-    prev.clueIndex === next.clueIndex &&
-    prev.scoreA === next.scoreA &&
-    prev.scoreB === next.scoreB &&
-    prev.currentTeam === next.currentTeam &&
-    prev.revealed === next.revealed &&
-    prev.order === next.order
-  );
-}
-
+/** POST one snapshot, with a single delayed retry. Fire-and-forget stays the
+ *  failure mode (views work standalone), but a lone dropped request no longer
+ *  loses the move until the next mutation. */
 function broadcast(state: GameState, room: string, role: CloudRole) {
-  const payload: WirePayload = {
-    at: Date.now(),
-    session: sessionId,
-    origin: role,
-    state,
-  };
-  fetch('/api/state', {
-    method: 'POST',
-    headers: {'content-type': 'application/json'},
-    body: JSON.stringify({room, snapshot: payload}),
-  }).catch(() => {
-    /* unreachable: views stay standalone */
+  const seq = ++broadcastSeq;
+  const body = JSON.stringify({
+    room,
+    snapshot: {
+      at: Date.now(),
+      session: sessionId,
+      origin: role,
+      state,
+    } satisfies WirePayload,
+  });
+  const send = () =>
+    fetch('/api/state', {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body,
+    });
+  send().catch(() => {
+    if (seq !== broadcastSeq || typeof window === 'undefined') return;
+    window.setTimeout(() => {
+      if (seq === broadcastSeq) send().catch(() => {});
+    }, 1000);
   });
 }
 
@@ -178,10 +192,16 @@ async function pollOnce(
 
 function stopPolling() {
   if (pollTimer !== null) {
-    window.clearInterval(pollTimer);
+    window.clearTimeout(pollTimer);
     pollTimer = null;
   }
   setConnected(false);
+}
+
+/** Cadence follows the game: fast while a round runs, slow otherwise, so an
+ *  idle open tab sips instead of chugging Blob operations. */
+function pollDelay(): number {
+  return getGameState().phase === 'running' ? POLL_MS : IDLE_POLL_MS;
 }
 
 function startPolling(
@@ -189,11 +209,15 @@ function startPolling(
   onRemoteState: (state: GameState) => void,
 ) {
   stopPolling();
-  void pollOnce(room, onRemoteState);
-  pollTimer = window.setInterval(
-    () => void pollOnce(room, onRemoteState),
-    POLL_MS,
-  );
+  const tick = () => {
+    if (pollTimer === null) return;
+    void pollOnce(room, onRemoteState).finally(() => {
+      if (pollTimer !== null) {
+        pollTimer = window.setTimeout(tick, pollDelay());
+      }
+    });
+  };
+  pollTimer = window.setTimeout(tick, 0);
 }
 
 export function attachCloud(opts: {
@@ -201,13 +225,16 @@ export function attachCloud(opts: {
   onRemoteState: (state: GameState) => void;
 }) {
   if (typeof window === 'undefined') return;
-  if (attachedRole === opts.role) return;
+  const room = resolveRoom();
+  if (attachedRole === opts.role && attachedRoom === room) return;
+  // Role or ?room= changed (e.g. the teacher pasted a new room code):
+  // tear down the old link before attaching the new one.
   if (cleanup) {
     cleanup();
     cleanup = null;
   }
   attachedRole = opts.role;
-  const room = resolveRoom();
+  attachedRoom = room;
   snapshot = {connected: false, room};
   if (!cloudAvailable()) return;
   prevState = getGameState();
@@ -234,6 +261,7 @@ export function attachCloud(opts: {
     document.removeEventListener('visibilitychange', onVisibility);
     stopPolling();
     attachedRole = null;
+    attachedRoom = null;
   };
 
   startPolling(room, onRemoteState);

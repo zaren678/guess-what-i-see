@@ -1,13 +1,17 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {
+  Chip,
+  ChipStyle,
   Page,
   Panel,
   ScrollView,
+  SliderBar,
+  SliderBarSize,
   TextColor,
   TextStyle,
   TextView,
 } from '@wearables-ui-toolkit/mrbd';
-import {getDeck} from '../domain';
+import {formatCountdown, ROUND_SECONDS, getDeck} from '../domain';
 import {useGame, type PublicAction} from '../game/useGame';
 import {
   EMPTY_SCHEMA,
@@ -188,10 +192,26 @@ function LinkBadge({connected}: {connected: boolean}) {
   );
 }
 
+/** Transient on-glasses banner for scoring moments. Derived locally by
+ *  watching synced state transitions -- the cloud only carries snapshots,
+ *  so the glasses infer "got it" vs "skipped" from what changed. */
+type Flash = {text: string} | null;
+
+/** Seconds left at which the timer switches to its hurry-up treatment. */
+const HURRY_SECONDS = 10;
+/** How long a celebration banner stays up (roughly one sync cycle). */
+const FLASH_MS = 2600;
+
+function winnerOf(scoreA: number, scoreB: number): 'A' | 'B' | null {
+  if (scoreA === scoreB) return null;
+  return scoreA > scoreB ? 'A' : 'B';
+}
+
 /**
- * Glasses `/deck/:deckId`: a pure display for the describer. The teacher
- * drives everything from the laptop; this screen only shows the current
- * secret word (or a waiting state). Voice commands keep working as a backup.
+ * Glasses `/`: a pure display for the describer. The teacher drives
+ * everything from the laptop; this screen shows the countdown, the secret
+ * word with its don't-say words, and celebration moments. Voice commands
+ * keep working as a backup.
  */
 export function CluePage() {
   const {state, mutate, connected} = useGame();
@@ -199,6 +219,57 @@ export function CluePage() {
   stateRef.current = state;
   const linkRef = useRef({connected, mutate});
   linkRef.current = {connected, mutate};
+
+  // Celebration state: a transient banner plus a consecutive-got-it streak.
+  // Both derive from synced snapshot transitions, so missed polls degrade
+  // gracefully (a +2 jump still flashes once with the right delta).
+  const total = state.scoreA + state.scoreB;
+  const [flash, setFlash] = useState<Flash>(null);
+  const [streak, setStreak] = useState(0);
+  const prevRef = useRef({clueIndex: state.clueIndex, total, phase: state.phase});
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    const phaseChanged = state.phase !== prev.phase;
+    if (
+      (phaseChanged &&
+        state.phase === 'running' &&
+        (prev.phase === 'idle' || prev.phase === 'complete')) ||
+      (phaseChanged && state.phase === 'idle')
+    ) {
+      // Fresh round (or reset): streaks don't carry over.
+      setStreak(0);
+      setFlash(null);
+    } else if (total > prev.total && state.phase === 'running') {
+      // Running only: the teacher's score steppers also work while
+      // paused, and those quiet adjustments must not flash or streak.
+      const delta = total - prev.total;
+      setStreak(s => s + delta);
+      setFlash({
+        text:
+          delta === 1
+            ? `Got it! +1 for Team ${state.currentTeam}`
+            : `+${delta} for Team ${state.currentTeam} — way to go!`,
+      });
+    } else if (state.phase === 'running' && state.order.length > 0) {
+      // Only a forward step counts as a skip -- the teacher's Prev/Next
+      // navigation shouldn't flash (or reset the streak) on a rewind.
+      const advanced =
+        state.clueIndex === (prev.clueIndex + 1) % state.order.length;
+      if (advanced && total === prev.total) {
+        setStreak(0);
+        setFlash({text: 'Skipped — next word!'});
+      }
+    }
+    prevRef.current = {clueIndex: state.clueIndex, total, phase: state.phase};
+  }, [state.clueIndex, state.phase, state.currentTeam, state.order.length, total]);
+
+  // Celebration banners clear after one sync cycle.
+  useEffect(() => {
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(null), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flash]);
 
   // WebMCP: the wearer can drive the round by speaking to Meta AI.
   useEffect(() => {
@@ -223,6 +294,8 @@ export function CluePage() {
       : undefined;
   const phase = state.phase;
   const playing = phase === 'running' || phase === 'paused';
+  const lowTime = state.remainingSeconds <= HURRY_SECONDS;
+  const winner = winnerOf(state.scoreA, state.scoreB);
 
   return (
     <Page headerText="Clue" enableSystemBarInset={false}>
@@ -231,24 +304,88 @@ export function CluePage() {
           <div className="content-inset">
             {phase === 'idle' && (
               <>
-                <TextView as="p" textStyle={TextStyle.BODY2_EMPHASIZED}>
-                  Waiting for teacher…
+                <TextView as="h2" textStyle={TextStyle.HEADING2}>
+                  You're the describer!
                 </TextView>
                 {deck && (
                   <TextView as="p" textStyle={TextStyle.BODY2}>
                     {deck.title}
                   </TextView>
                 )}
+                <TextView
+                  as="p"
+                  textStyle={TextStyle.BODY2}
+                  textColor={TextColor.SECONDARY}>
+                  Waiting for teacher to start the round…
+                </TextView>
                 <LinkBadge connected={connected} />
               </>
             )}
 
             {playing && card && (
               <>
+                <Chip
+                  text={`Team ${state.currentTeam} describes`}
+                  chipStyle={ChipStyle.EMPHASIZED}
+                />
+                <TextView
+                  as="p"
+                  textStyle={TextStyle.NUMERAL2}
+                  textColor={lowTime ? TextColor.ACCENT : TextColor.PRIMARY}>
+                  {formatCountdown(state.remainingSeconds)}
+                </TextView>
+                <SliderBar
+                  minimumValue={0}
+                  maximumValue={ROUND_SECONDS}
+                  value={state.remainingSeconds}
+                  size={SliderBarSize.THIN}
+                  animated
+                />
+                {lowTime && phase === 'running' && (
+                  <TextView
+                    as="p"
+                    textStyle={TextStyle.LABEL_EMPHASIZED}
+                    textColor={TextColor.ACCENT}>
+                    Hurry — almost out of time!
+                  </TextView>
+                )}
+                {flash && (
+                  <Chip text={flash.text} chipStyle={ChipStyle.ELEVATED} />
+                )}
+                {streak >= 2 && (
+                  <TextView
+                    as="p"
+                    textStyle={TextStyle.LABEL_EMPHASIZED}
+                    textColor={TextColor.ACCENT}>
+                    {streak} in a row — keep going!
+                  </TextView>
+                )}
                 <Eyebrow>{card.category}</Eyebrow>
-                <TextView as="p" textStyle={TextStyle.BODY2_EMPHASIZED}>
+                <TextView as="p" textStyle={TextStyle.HEADING1}>
                   {card.word}
                 </TextView>
+                <TextView
+                  as="p"
+                  textStyle={TextStyle.BODY2}
+                  textColor={TextColor.SECONDARY}>
+                  Clue {state.clueIndex + 1} of {state.order.length}
+                </TextView>
+                {card.forbiddenWords.length > 0 && (
+                  <>
+                    <Eyebrow>Don't say</Eyebrow>
+                    <TextView as="p" textStyle={TextStyle.BODY2}>
+                      {card.forbiddenWords.join(', ')}
+                    </TextView>
+                  </>
+                )}
+                {card.hint && (
+                  <>
+                    <Eyebrow>Hint</Eyebrow>
+                    <TextView as="p" textStyle={TextStyle.BODY2}>
+                      {card.hint}
+                    </TextView>
+                  </>
+                )}
                 {phase === 'paused' && (
                   <TextView as="p" textStyle={TextStyle.BODY2}>
                     Paused — waiting for teacher…
@@ -260,8 +397,8 @@ export function CluePage() {
 
             {phase === 'complete' && (
               <>
-                <TextView as="p" textStyle={TextStyle.BODY2_EMPHASIZED}>
-                  Round over
+                <TextView as="h2" textStyle={TextStyle.HEADING2}>
+                  {winner ? `Team ${winner} wins!` : `It's a tie!`}
                 </TextView>
                 <TextView as="p" textStyle={TextStyle.BODY2}>
                   Team A {state.scoreA} · Team B {state.scoreB}

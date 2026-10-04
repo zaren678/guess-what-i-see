@@ -75,6 +75,11 @@ export function TeacherConsolePage() {
       else if (k === 'n') go({type: 'goto', index: state.clueIndex + 1});
       else if (k === 'p') go({type: 'goto', index: state.clueIndex - 1});
       else if (e.key === ' ') {
+        // A focused button already fires on Space natively; handling it
+        // here too would double-apply the action.
+        if (target && (target.tagName === 'BUTTON' || target.tagName === 'A')) {
+          return;
+        }
         e.preventDefault();
         go(startPauseAction);
       }

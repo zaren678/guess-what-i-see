@@ -5,20 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --test --import ./test/hooks.mjs \"test/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "relay": "node server/relay.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/blob": "^2.8.0",
     "@wearables-ui-toolkit/icons": "129.0.0",
     "@wearables-ui-toolkit/mrbd": "129.0.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "react-router-dom": "^7.18.4",
-    "@vercel/blob": "^2.8.0"
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@types/node": "^26.6.4",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.1.1",
