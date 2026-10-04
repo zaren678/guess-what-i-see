@@ -20,8 +20,9 @@ round from a laptop.
   state and nothing accumulates. Direct reads need the `GWIS_BLOB_BASE_URL`
   env var on the Vercel project (the store's public base URL: dashboard →
   Storage → `gwis-state`, e.g. `https://<store-id>.public.blob.vercel-storage.com`,
-  no trailing slash); when unset, reads fall back to listing for the newest
-  blob. Same-room polling every 2.5s while running, 10s when idle.
+  no trailing slash) — set on the Vercel project (production + preview);
+  when unset, reads fall back to listing for the newest blob. Same-room
+  polling every 2.5s while running, 10s when idle.
 
 ## Decks
 
