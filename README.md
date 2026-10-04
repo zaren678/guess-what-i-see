@@ -15,7 +15,13 @@ round from a laptop.
   `S` skip, `Space` start/pause, `N`/`P` next/previous clue.
 - **Sync** — the glasses and laptop link with no relay server: both sides
   POST/GET state snapshots through `api/state.ts`, backed by a Vercel Blob
-  store (one JSON blob per write, newest wins). Same-room polling every 2.5s.
+  store. Each room owns one stable blob (`gwis/<room>/state.json`) that every
+  write overwrites and reads fetch directly — zero `list()` calls in steady
+  state and nothing accumulates. Direct reads need the `GWIS_BLOB_BASE_URL`
+  env var on the Vercel project (the store's public base URL: dashboard →
+  Storage → `gwis-state`, e.g. `https://<store-id>.public.blob.vercel-storage.com`,
+  no trailing slash); when unset, reads fall back to listing for the newest
+  blob. Same-room polling every 2.5s while running, 10s when idle.
 
 ## Decks
 
@@ -45,13 +51,3 @@ Live: https://guess-what-i-see.vercel.app
 Deployments are automatic: the Vercel project is linked to this repo, so
 every push to `main` builds and publishes a new production version.
 Pushes to other branches get preview URLs instead.
-
-## Sync internals (`api/state.ts`)
-
-One stable blob per room (`gwis/<room>/state.json`), overwritten on write
-and fetched directly on read — no `list()` calls in steady state and nothing
-accumulates. Requires the `GWIS_BLOB_BASE_URL` env var on the Vercel project:
-the store's public base URL (dashboard → Storage → `gwis-state`, e.g.
-`https://<store-id>.public.blob.vercel-storage.com`, no trailing slash).
-When it is unset, the endpoint falls back to the legacy path (unique key per
-write + `list()` to find the newest), so the app keeps working either way.
