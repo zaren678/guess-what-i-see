@@ -8,6 +8,7 @@
     "test": "node --test --import ./test/hooks.mjs \"test/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
+    "postbuild": "node scripts/assert-decks-bundled.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

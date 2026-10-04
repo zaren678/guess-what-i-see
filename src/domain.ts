@@ -31,10 +31,14 @@ export const ROUND_SECONDS = 60;
 // Vite statically bundles every decks/*.json here. Outside a Vite build
 // (e.g. node:test) import.meta.glob is unavailable, so there are simply no
 // bundled decks and DECKS is empty.
-const deckModules: Record<string, {default?: unknown}> =
-  typeof import.meta.glob === 'function'
-    ? import.meta.glob<{default?: unknown}>('../decks/*.json', {eager: true})
-    : {};
+let deckModules: Record<string, {default?: unknown}>;
+try {
+  deckModules = import.meta.glob<{default?: unknown}>('../decks/*.json', {
+    eager: true,
+  });
+} catch {
+  deckModules = {};
+}
 
 export function normalizeDeck(raw: unknown): Deck | null {
   if (!isDeckJson(raw)) return null;

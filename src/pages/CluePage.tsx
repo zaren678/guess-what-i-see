@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {
   Chip,
   ChipStyle,
+  IconImage,
   Page,
   Panel,
   ScrollView,
@@ -11,6 +12,10 @@ import {
   TextStyle,
   TextView,
 } from '@wearables-ui-toolkit/mrbd';
+import {
+  cloudCheckOutline,
+  cloudSlashOutline,
+} from '@wearables-ui-toolkit/icons';
 import {formatCountdown, ROUND_SECONDS, getDeck} from '../domain';
 import {useGame, type PublicAction} from '../game/useGame';
 import {
@@ -184,11 +189,19 @@ function Eyebrow({children}: {children: React.ReactNode}) {
   );
 }
 
+/** Link status as a compact icon: a full line of "Linked" text wastes the
+ *  describer's glanceable space. Glyphs are decorative to screen readers,
+ *  so the accessible name lives on the wrapper. */
 function LinkBadge({connected}: {connected: boolean}) {
+  const label = connected ? 'Linked to teacher console' : 'Offline';
   return (
-    <TextView as="p" textStyle={TextStyle.META1} textColor={TextColor.SECONDARY}>
-      {connected ? 'Linked' : 'Offline'}
-    </TextView>
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      style={{opacity: connected ? 1 : 0.55}}>
+      <IconImage source={connected ? cloudCheckOutline : cloudSlashOutline} />
+    </span>
   );
 }
 

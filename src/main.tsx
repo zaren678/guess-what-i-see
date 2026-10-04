@@ -1,4 +1,4 @@
-import {App} from '@wearables-ui-toolkit/mrbd';
+import {App, ToastContainer} from '@wearables-ui-toolkit/mrbd';
 import {
   ReactRouterNavigationProvider,
   ReactRouterPageTransition,
@@ -16,6 +16,9 @@ function Root() {
     <BrowserRouter>
       <ReactRouterNavigationProvider>
         <App>
+          {/* Required once at the root: without it Toast.show() silently
+              renders nothing (projector button feedback depends on it). */}
+          <ToastContainer />
           <ReactRouterPageTransition>
             {({location}) => (
               <Routes location={location}>
