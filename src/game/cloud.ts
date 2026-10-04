@@ -1,0 +1,240 @@
+import {getGameState, subscribeGameState} from './store';
+import type {GameState} from './state';
+
+/**
+ * Cloud link between the glasses web app and the teacher console.
+ *
+ * The deployment is static, so shared state lives behind a tiny same-origin
+ * API (api/state.ts) backed by the project's Blob store: every discrete
+ * local game mutation is POSTed as a full state snapshot, and each side polls
+ * for newer snapshots every few seconds. Last-writer-wins by wall-clock
+ * mutation time; the 1-second TICK is never broadcast (each side ticks
+ * locally from the last synced snapshot). When the API is unreachable both
+ * sides keep working standalone -- the link badge simply reads Offline.
+ *
+ * Room defaults to "primary" so Sunday just works with zero setup.
+ * Override with ?room=<code> (persisted to localStorage) for a private room.
+ */
+
+const ROOM_KEY = 'gwis.room';
+const DEFAULT_ROOM = 'primary';
+const POLL_MS = 2500;
+const STALE_MS = 8000;
+/** Snapshots older than this are never a live game; ignore on first sight. */
+const MAX_SNAPSHOT_AGE = 2 * 60 * 60 * 1000;
+/**
+ * The link needs the same-origin /api/state function, which only exists on
+ * the deployed site (local `vite preview` serves static files only), so the
+ * cloud stays dormant on loopback and the app runs standalone there.
+ */
+function cloudAvailable(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+}
+
+export type CloudRole = 'teacher' | 'glasses';
+
+export function resolveRoom(): string {
+  if (typeof window === 'undefined') return DEFAULT_ROOM;
+  try {
+    const param = new URLSearchParams(window.location.search).get('room');
+    if (param && /^[\w-]{1,32}$/.test(param)) {
+      window.localStorage.setItem(ROOM_KEY, param);
+      return param;
+    }
+    const stored = window.localStorage.getItem(ROOM_KEY);
+    if (stored && /^[\w-]{1,32}$/.test(stored)) return stored;
+  } catch {
+    /* storage unavailable: fall through to default */
+  }
+  return DEFAULT_ROOM;
+}
+
+type Snapshot = {connected: boolean; room: string};
+let snapshot: Snapshot = {connected: false, room: DEFAULT_ROOM};
+const listeners = new Set<() => void>();
+function emit() {
+  listeners.forEach(l => l());
+}
+export function subscribeCloud(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+export function getCloudSnapshot(): Snapshot {
+  return snapshot;
+}
+function setConnected(value: boolean) {
+  if (snapshot.connected !== value) {
+    snapshot = {...snapshot, connected: value};
+    emit();
+  }
+}
+
+type WirePayload = {
+  at: number;
+  session: string;
+  origin: CloudRole;
+  state: GameState;
+};
+
+const sessionId = Math.random().toString(36).slice(2, 10);
+let attachedRole: CloudRole | null = null;
+let cleanup: (() => void) | null = null;
+let pollTimer: number | null = null;
+let lastAt = 0;
+let lastAdoptedAt = 0;
+let lastPollOkAt = 0;
+let applyingRemote = false;
+let prevState: GameState | null = null;
+
+function isTickOnly(prev: GameState, next: GameState): boolean {
+  return (
+    prev.phase === 'running' &&
+    next.phase === 'running' &&
+    next.remainingSeconds === prev.remainingSeconds - 1 &&
+    prev.deckId === next.deckId &&
+    prev.clueIndex === next.clueIndex &&
+    prev.scoreA === next.scoreA &&
+    prev.scoreB === next.scoreB &&
+    prev.currentTeam === next.currentTeam &&
+    prev.revealed === next.revealed &&
+    prev.order === next.order
+  );
+}
+
+function broadcast(state: GameState, room: string, role: CloudRole) {
+  const payload: WirePayload = {
+    at: Date.now(),
+    session: sessionId,
+    origin: role,
+    state,
+  };
+  fetch('/api/state', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({room, snapshot: payload}),
+  }).catch(() => {
+    /* unreachable: views stay standalone */
+  });
+}
+
+function adopt(
+  payload: WirePayload,
+  onRemoteState: (state: GameState) => void,
+) {
+  if (payload.session === sessionId) return;
+  if (payload.at <= lastAdoptedAt) return;
+  lastAdoptedAt = payload.at;
+  const s = payload.state;
+  const adjusted: GameState =
+    s.phase === 'running'
+      ? {
+          ...s,
+          remainingSeconds: Math.max(
+            0,
+            s.remainingSeconds - Math.floor((Date.now() - payload.at) / 1000),
+          ),
+        }
+      : s;
+  applyingRemote = true;
+  try {
+    onRemoteState(adjusted);
+  } finally {
+    applyingRemote = false;
+  }
+}
+
+async function pollOnce(
+  room: string,
+  onRemoteState: (state: GameState) => void,
+) {
+  try {
+    const res = await fetch(
+      `/api/state?room=${encodeURIComponent(room)}&since=${lastAt}`,
+      {cache: 'no-store'},
+    );
+    if (res.status === 204) {
+      lastPollOkAt = Date.now();
+      setConnected(true);
+      return;
+    }
+    if (!res.ok) throw new Error(`http ${res.status}`);
+    const data = (await res.json()) as {
+      snapshot?: WirePayload;
+      at?: number;
+    };
+    lastPollOkAt = Date.now();
+    setConnected(true);
+    if (data.at) lastAt = Math.max(lastAt, data.at);
+    if (data.snapshot && typeof data.snapshot.at === 'number') {
+      adopt(data.snapshot, onRemoteState);
+    }
+  } catch {
+    if (Date.now() - lastPollOkAt > STALE_MS) setConnected(false);
+  }
+}
+
+function stopPolling() {
+  if (pollTimer !== null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  setConnected(false);
+}
+
+function startPolling(
+  room: string,
+  onRemoteState: (state: GameState) => void,
+) {
+  stopPolling();
+  void pollOnce(room, onRemoteState);
+  pollTimer = window.setInterval(
+    () => void pollOnce(room, onRemoteState),
+    POLL_MS,
+  );
+}
+
+export function attachCloud(opts: {
+  role: CloudRole;
+  onRemoteState: (state: GameState) => void;
+}) {
+  if (typeof window === 'undefined') return;
+  if (attachedRole === opts.role) return;
+  if (cleanup) {
+    cleanup();
+    cleanup = null;
+  }
+  attachedRole = opts.role;
+  const room = resolveRoom();
+  snapshot = {connected: false, room};
+  if (!cloudAvailable()) return;
+  prevState = getGameState();
+  lastAdoptedAt = Date.now() - MAX_SNAPSHOT_AGE;
+  const {role, onRemoteState} = opts;
+
+  const unsubStore = subscribeGameState(() => {
+    const next = getGameState();
+    const prev = prevState;
+    prevState = next;
+    if (!prev || applyingRemote) return;
+    if (isTickOnly(prev, next)) return;
+    broadcast(next, room, role);
+  });
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') stopPolling();
+    else startPolling(room, onRemoteState);
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+
+  cleanup = () => {
+    unsubStore();
+    document.removeEventListener('visibilitychange', onVisibility);
+    stopPolling();
+    attachedRole = null;
+  };
+
+  startPolling(room, onRemoteState);
+}

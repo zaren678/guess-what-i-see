@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.wearables-test/
+*.log
+.DS_Store

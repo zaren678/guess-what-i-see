@@ -1,0 +1,43 @@
+# Guess What I See
+
+A classroom guessing game for LDS Primary (built for CTR 6, 7-year-olds): one
+kid wears **Ray-Ban Meta Display glasses** and sees a secret word, describes
+it without saying it, and the class guesses. The teacher drives the whole
+round from a laptop.
+
+- **Glasses** (`/`) — a pure display: "Waiting for teacher…" when idle, then
+  just the secret word + category during a round. No buttons; voice commands
+  ("Hey Meta, we got it" / "skip this one" / "start the round") work as a
+  backup via WebMCP.
+- **Teacher console** (`/teacher`) — the mission control: full clue card
+  (word, don't-say words, hint), color-coded "Team X describes" turn banner,
+  round controls, scoreboard, projector mode. Keyboard shortcuts: `G` got it,
+  `S` skip, `Space` start/pause, `N`/`P` next/previous clue.
+- **Sync** — the glasses and laptop link with no relay server: both sides
+  POST/GET state snapshots through `api/state.ts`, backed by a Vercel Blob
+  store (one JSON blob per write, newest wins). Same-room polling every 2.5s.
+
+## Decks
+
+Clue decks live in `decks/` as JSON (see `decks/README.md` for the format).
+`old-testament-heroes.json` and `primary-favorites.json` are bundled.
+
+## Develop
+
+```bash
+npm install
+npm run dev        # glasses + console, local (cloud link dormant on localhost)
+./scripts/gate.sh  # Meta wearables gate for the glasses experience
+```
+
+The gate judges the glasses routes only (`/`, `/deck/*`). The teacher
+console (`/teacher/*`) is a laptop page (plain HTML/CSS, no UI Toolkit) and is
+stubbed out of the gate copy — see `scripts/gate.sh` for the two documented
+exemptions.
+
+## Deploy
+
+Vercel, framework Vite, build `npm run build`, output `dist`. Connect a Blob
+store named `gwis-state` to the project so `api/state.ts` has its token.
+
+Live: https://guess-what-i-see.vercel.app

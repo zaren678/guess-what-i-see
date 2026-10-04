@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Guess What I See: a classroom guessing game for Meta Ray-Ban Display. One player describes, the class guesses. Voice commands confirm in one short sentence." />
+    <meta name="mrbd-web-app-capable" content="yes" />
+    <link rel="icon" href="data:," />
+    <title>Guess What I See — Primary Guessing Game</title>
+    <!--
+      The UI Toolkit's App component injects a Google Fonts stylesheet at
+      runtime unless an element with id "uit-noto-sans-font" already exists.
+      Pre-seeding it here with local-only @font-face rules keeps the "Noto
+      Sans Local" family working from system fonts and avoids the third-party
+      font CDN entirely (bytes, an extra connection, and breakage offline --
+      the Toolkit's own performance guidance says to drop it). Nothing in the
+      installed Toolkit package was modified.
+    -->
+    <style id="uit-noto-sans-font">
+      @font-face {
+        font-family: 'Noto Sans Local';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: local('Noto Sans'), local('Noto Sans Regular'), local('NotoSans-Regular');
+      }
+      @font-face {
+        font-family: 'Noto Sans Local';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: local('Noto Sans Medium'), local('NotoSans-Medium');
+      }
+      @font-face {
+        font-family: 'Noto Sans Local';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: local('Noto Sans Bold'), local('NotoSans-Bold');
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
