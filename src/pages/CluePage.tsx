@@ -225,7 +225,7 @@ function winnerOf(scoreA: number, scoreB: number): 'A' | 'B' | null {
  * keep working as a backup.
  */
 export function CluePage() {
-  const {state, mutate, connected} = useGame();
+  const {state, mutate, connected, room} = useGame();
   const stateRef = useRef(state);
   stateRef.current = state;
   const linkRef = useRef({connected, mutate});
@@ -323,6 +323,14 @@ export function CluePage() {
                     {deck.title}
                   </TextView>
                 )}
+                {/* Room code lives on the idle screen: it is the pairing
+                    check (both sides must show the same room to link). */}
+                <TextView
+                  as="p"
+                  textStyle={TextStyle.BODY2}
+                  textColor={TextColor.SECONDARY}>
+                  Room {room}
+                </TextView>
                 <TextView
                   as="p"
                   textStyle={TextStyle.BODY2}

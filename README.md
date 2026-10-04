@@ -21,8 +21,11 @@ round from a laptop.
   env var on the Vercel project (the store's public base URL: dashboard →
   Storage → `gwis-state`, e.g. `https://<store-id>.public.blob.vercel-storage.com`,
   no trailing slash) — set on the Vercel project (production + preview);
-  when unset, reads fall back to listing for the newest blob. Same-room
-  polling every 2.5s while running, 10s when idle.
+  when unset, reads fall back to listing for the newest blob. Both sides
+  poll every 2.5s. Malformed snapshots are rejected at the boundary, and
+  broadcasts retry with backoff until the server confirms. Both screens show
+  the room code (they must match to link), and the teacher console warns
+  while any move is unconfirmed.
 
 ## Decks
 

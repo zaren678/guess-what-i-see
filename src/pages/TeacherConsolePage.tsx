@@ -30,7 +30,7 @@ export function TeacherConsolePage() {
   const {deckId} = useParams();
   const navigate = useNavigate();
   const deck = getDeck(deckId);
-  const {state, mutate, connected} = useGame();
+  const {state, mutate, connected, room, synced} = useGame();
 
   useEnsureDeckSelected(deckId);
 
@@ -118,6 +118,12 @@ export function TeacherConsolePage() {
             <span className="tcon-timer">
               {formatCountdown(state.remainingSeconds)}
             </span>
+            {'  ·  '}Room {room}
+            {!synced && (
+              <span className="tcon-warn">
+                Not syncing — moves may not reach the glasses
+              </span>
+            )}
           </p>
         </div>
         <button

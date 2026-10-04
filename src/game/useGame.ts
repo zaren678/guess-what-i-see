@@ -49,6 +49,7 @@ export function useGame() {
     mutate,
     connected: cloud.connected,
     room: cloud.room,
+    synced: cloud.synced,
   };
 }
 

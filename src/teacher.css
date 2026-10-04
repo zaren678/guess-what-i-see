@@ -57,6 +57,11 @@
   color: #f2f4f8;
 }
 
+.tcon-warn {
+  font-weight: 700;
+  color: #ffb020;
+}
+
 .tcon-main {
   display: grid;
   grid-template-columns: 1.55fr 1fr;

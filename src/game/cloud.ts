@@ -67,8 +67,8 @@ export function resolveRoom(): string {
   return DEFAULT_ROOM;
 }
 
-type Snapshot = {connected: boolean; room: string};
-let snapshot: Snapshot = {connected: false, room: DEFAULT_ROOM};
+type Snapshot = {connected: boolean; room: string; synced: boolean};
+let snapshot: Snapshot = {connected: false, room: DEFAULT_ROOM, synced: true};
 const listeners = new Set<() => void>();
 function emit() {
   listeners.forEach(l => l());
@@ -85,6 +85,13 @@ export function getCloudSnapshot(): Snapshot {
 function setConnected(value: boolean) {
   if (snapshot.connected !== value) {
     snapshot = {...snapshot, connected: value};
+    emit();
+  }
+}
+
+function setSynced(value: boolean) {
+  if (snapshot.synced !== value) {
+    snapshot = {...snapshot, synced: value};
     emit();
   }
 }
@@ -109,9 +116,14 @@ let prevState: GameState | null = null;
 /** Monotonic id so a delayed broadcast retry never overwrites a newer move. */
 let broadcastSeq = 0;
 
-/** POST one snapshot, with a single delayed retry. Fire-and-forget stays the
- *  failure mode (views work standalone), but a lone dropped request no longer
- *  loses the move until the next mutation. */
+/**
+ * POST one snapshot, retrying with backoff until the server confirms or a
+ * newer local move supersedes it. A lost write used to die silently (one
+ * retry, no signal) while the teacher saw the move applied locally -- now
+ * every send tracks server confirmation and the teacher console warns while
+ * any move is unconfirmed.
+ */
+const BROADCAST_RETRIES = 4;
 function broadcast(state: GameState, room: string, role: CloudRole) {
   const seq = ++broadcastSeq;
   const body = JSON.stringify({
@@ -123,18 +135,31 @@ function broadcast(state: GameState, room: string, role: CloudRole) {
       state,
     } satisfies WirePayload,
   });
-  const send = () =>
+  let attempt = 0;
+  const send = () => {
+    if (seq !== broadcastSeq || typeof window === 'undefined') return;
+    attempt += 1;
     fetch('/api/state', {
       method: 'POST',
       headers: {'content-type': 'application/json'},
       body,
-    });
-  send().catch(() => {
-    if (seq !== broadcastSeq || typeof window === 'undefined') return;
-    window.setTimeout(() => {
-      if (seq === broadcastSeq) send().catch(() => {});
-    }, 1000);
-  });
+    })
+      .then(res => {
+        if (seq !== broadcastSeq) return;
+        if (!res.ok) throw new Error(`http ${res.status}`);
+        setSynced(true);
+      })
+      .catch(() => {
+        if (seq !== broadcastSeq) return;
+        setSynced(false);
+        if (attempt <= BROADCAST_RETRIES) {
+          window.setTimeout(() => {
+            if (seq === broadcastSeq) send();
+          }, 1000 * attempt);
+        }
+      });
+  };
+  send();
 }
 
 function adopt(
@@ -232,7 +257,7 @@ export function attachCloud(opts: {
   }
   attachedRole = opts.role;
   attachedRoom = room;
-  snapshot = {connected: false, room};
+  snapshot = {connected: false, room, synced: true};
   if (!cloudAvailable()) return;
   prevState = getGameState();
   lastAdoptedAt = Date.now() - MAX_SNAPSHOT_AGE;
