@@ -41,3 +41,7 @@ Vercel, framework Vite, build `npm run build`, output `dist`. Connect a Blob
 store named `gwis-state` to the project so `api/state.ts` has its token.
 
 Live: https://guess-what-i-see.vercel.app
+
+Deployments are automatic: the Vercel project is linked to this repo, so
+every push to `main` builds and publishes a new production version.
+Pushes to other branches get preview URLs instead.
