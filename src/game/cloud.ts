@@ -20,11 +20,11 @@ const ROOM_KEY = 'gwis.room';
 const DEFAULT_ROOM = 'primary';
 /**
  * Poll cadence, running or idle alike. Reads are cheap direct fetches of one
- * small key (no billable list calls since the stable-key change), so an idle
- * tab sipping every 2.5s costs essentially nothing -- and the describer never
- * stares at a stale screen for 10s after the teacher hits Start.
+ * small key (no billable list calls since the stable-key change), so polling
+ * every second costs essentially nothing and keeps both sides within one
+ * beat of each other.
  */
-const POLL_MS = 2500;
+const POLL_MS = 1000;
 const STALE_MS = 8000;
 /** Snapshots older than this are never a live game; ignore on first sight. */
 const MAX_SNAPSHOT_AGE = 2 * 60 * 60 * 1000;
