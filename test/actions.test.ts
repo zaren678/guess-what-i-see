@@ -17,11 +17,8 @@ const roundTrip: PublicAction[] = [
   {type: 'skip'},
   {type: 'end'},
   {type: 'reset'},
-  {type: 'pointA'},
-  {type: 'pointB'},
-  {type: 'unpointA'},
-  {type: 'unpointB'},
-  {type: 'switchTeam'},
+  {type: 'scoreUp'},
+  {type: 'scoreDown'},
   {type: 'reveal'},
   {type: 'hide'},
 ];
@@ -56,11 +53,11 @@ test('commandToPublicAction inverts the mapping and rejects junk', () => {
 
 test('applyPublicAction drives the shared store', () => {
   dispatchGame({type: 'APPLY_STATE', state: initialGameState});
-  applyPublicAction({type: 'pointA'});
-  assert.equal(getGameState().scoreA, 1);
-  applyPublicAction({type: 'unpointA'});
-  applyPublicAction({type: 'unpointA'});
-  assert.equal(getGameState().scoreA, 0);
+  applyPublicAction({type: 'scoreUp'});
+  assert.equal(getGameState().score, 1);
+  applyPublicAction({type: 'scoreDown'});
+  applyPublicAction({type: 'scoreDown'});
+  assert.equal(getGameState().score, 0);
 
   // No deck loaded in this environment: moves that need cards no-op.
   const before = getGameState();
