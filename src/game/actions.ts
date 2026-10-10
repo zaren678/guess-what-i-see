@@ -12,11 +12,8 @@ export type PublicAction =
   | {type: 'end'}
   | {type: 'reset'}
   | {type: 'goto'; index: number}
-  | {type: 'pointA'}
-  | {type: 'pointB'}
-  | {type: 'unpointA'}
-  | {type: 'unpointB'}
-  | {type: 'switchTeam'}
+  | {type: 'scoreUp'}
+  | {type: 'scoreDown'}
   | {type: 'reveal'}
   | {type: 'hide'}
   | {type: 'selectDeck'; deckId: string};
@@ -39,16 +36,10 @@ export function toRelayCommand(action: PublicAction): RelayCommand | null {
       return {action: 'reset'};
     case 'goto':
       return {action: 'goto', index: action.index};
-    case 'pointA':
-      return {action: 'pointA'};
-    case 'pointB':
-      return {action: 'pointB'};
-    case 'unpointA':
-      return {action: 'unpointA'};
-    case 'unpointB':
-      return {action: 'unpointB'};
-    case 'switchTeam':
-      return {action: 'switchTeam'};
+    case 'scoreUp':
+      return {action: 'scoreUp'};
+    case 'scoreDown':
+      return {action: 'scoreDown'};
     case 'reveal':
       return {action: 'reveal'};
     case 'hide':
@@ -89,16 +80,10 @@ function toGameAction(action: PublicAction, state: GameState): GameAction | null
       return {type: 'RESET_ROUND'};
     case 'goto':
       return {type: 'GOTO', index: action.index};
-    case 'pointA':
-      return {type: 'POINT', team: 'A', delta: 1};
-    case 'pointB':
-      return {type: 'POINT', team: 'B', delta: 1};
-    case 'unpointA':
-      return {type: 'POINT', team: 'A', delta: -1};
-    case 'unpointB':
-      return {type: 'POINT', team: 'B', delta: -1};
-    case 'switchTeam':
-      return {type: 'SWITCH_TEAM'};
+    case 'scoreUp':
+      return {type: 'ADJUST_SCORE', delta: 1};
+    case 'scoreDown':
+      return {type: 'ADJUST_SCORE', delta: -1};
     case 'reveal':
       return {type: 'SET_REVEALED', revealed: true};
     case 'hide':
@@ -136,16 +121,10 @@ export function commandToPublicAction(
       return {type: 'end'};
     case 'reset':
       return {type: 'reset'};
-    case 'pointA':
-      return {type: 'pointA'};
-    case 'pointB':
-      return {type: 'pointB'};
-    case 'unpointA':
-      return {type: 'unpointA'};
-    case 'unpointB':
-      return {type: 'unpointB'};
-    case 'switchTeam':
-      return {type: 'switchTeam'};
+    case 'scoreUp':
+      return {type: 'scoreUp'};
+    case 'scoreDown':
+      return {type: 'scoreDown'};
     case 'reveal':
       return {type: 'reveal'};
     case 'hide':
