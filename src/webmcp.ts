@@ -55,9 +55,8 @@ export type Snapshot = {
   hint: string | null;
   phase: GameState['phase'];
   remainingSeconds: number;
-  scoreA: number;
-  scoreB: number;
-  currentTeam: GameState['currentTeam'];
+  /** Shared score: no teams, the class plays together. */
+  score: number;
 };
 
 export function snapshotOf(state: GameState): Snapshot {
@@ -76,9 +75,7 @@ export function snapshotOf(state: GameState): Snapshot {
     hint: card?.hint ?? null,
     phase: state.phase,
     remainingSeconds: state.remainingSeconds,
-    scoreA: state.scoreA,
-    scoreB: state.scoreB,
-    currentTeam: state.currentTeam,
+    score: state.score,
   };
 }
 
@@ -87,7 +84,7 @@ export function describeGame(snapshot: Snapshot): string {
     `Deck "${snapshot.deckTitle}", clue ${snapshot.clueNumber} of ${snapshot.totalClues}. ` +
     `Secret word "${snapshot.word}" (${snapshot.category}); do-not-say: ${snapshot.forbiddenWords.join(', ') || 'none'}. ` +
     `Phase ${snapshot.phase}, ${snapshot.remainingSeconds}s left. ` +
-    `Team A ${snapshot.scoreA}, Team B ${snapshot.scoreB}; describing team ${snapshot.currentTeam}.`
+    `Shared score ${snapshot.score}.`
   );
 }
 
