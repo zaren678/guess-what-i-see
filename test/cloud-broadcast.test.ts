@@ -82,7 +82,7 @@ before(() => {
 test('broadcasts local mutations and marks them synced', async () => {
   postBehavior = 'ok';
   const base = fetchCalls.length;
-  dispatchGame({type: 'POINT', team: 'A', delta: 1});
+  dispatchGame({type: 'ADJUST_SCORE', delta: 1});
   await flush();
 
   const posts = postsSince(base);
@@ -90,12 +90,12 @@ test('broadcasts local mutations and marks them synced', async () => {
   assert.equal(posts[0].url, '/api/state');
   const payload = JSON.parse(posts[0].body) as {
     room: string;
-    snapshot: {origin: string; session: string; at: number; state: {scoreA: number}};
+    snapshot: {origin: string; session: string; at: number; state: {score: number}};
   };
   assert.equal(payload.room, 'primary');
   assert.equal(payload.snapshot.origin, 'teacher');
   assert.equal(typeof payload.snapshot.session, 'string');
-  assert.equal(payload.snapshot.state.scoreA, 1);
+  assert.equal(payload.snapshot.state.score, 1);
   assert.equal(getCloudSnapshot().synced, true);
 });
 
@@ -103,7 +103,7 @@ test('retries unacked sends with backoff, then stops', async () => {
   postBehavior = 'fail';
   retryDelays.length = 0;
   const base = fetchCalls.length;
-  dispatchGame({type: 'POINT', team: 'B', delta: 1});
+  dispatchGame({type: 'ADJUST_SCORE', delta: 1});
   await flush();
 
   assert.equal(postsSince(base).length, 1);
@@ -122,13 +122,13 @@ test('retries unacked sends with backoff, then stops', async () => {
 test('a newer move supersedes a failing send', async () => {
   postBehavior = 'fail';
   const base = fetchCalls.length;
-  dispatchGame({type: 'POINT', team: 'A', delta: 1});
+  dispatchGame({type: 'ADJUST_SCORE', delta: 1});
   await flush();
   assert.equal(postsSince(base).length, 1);
 
   // Newer move acks immediately; the older retry timer must go quiet.
   postBehavior = 'ok';
-  dispatchGame({type: 'POINT', team: 'A', delta: 1});
+  dispatchGame({type: 'ADJUST_SCORE', delta: 1});
   await flush();
   assert.equal(postsSince(base).length, 2);
   assert.equal(getCloudSnapshot().synced, true);
@@ -140,7 +140,7 @@ test('a newer move supersedes a failing send', async () => {
 test('non-OK responses count as unacked and recover on ack', async () => {
   postBehavior = 'http500';
   const base = fetchCalls.length;
-  dispatchGame({type: 'POINT', team: 'B', delta: 1});
+  dispatchGame({type: 'ADJUST_SCORE', delta: 1});
   await flush();
   assert.equal(postsSince(base).length, 1);
   assert.equal(getCloudSnapshot().synced, false);
