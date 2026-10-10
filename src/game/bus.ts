@@ -21,11 +21,8 @@ export type RelayCommand = {
     | 'end'
     | 'goto'
     | 'reset'
-    | 'pointA'
-    | 'pointB'
-    | 'unpointA'
-    | 'unpointB'
-    | 'switchTeam'
+    | 'scoreUp'
+    | 'scoreDown'
     | 'reveal'
     | 'hide';
   index?: number;
