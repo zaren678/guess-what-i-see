@@ -40,4 +40,20 @@ body {
   padding: var(--uit-spacing-large);
 }
 
+/* Glasses clue screen: the word, don't-say list, and hint must all be
+   visible without scrolling, so this layout uses a tight rhythm instead of
+   .content-inset's roomy gaps. */
+.clue-compact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uit-spacing-small);
+  min-inline-size: 0;
+}
+.clue-compact .clue-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uit-spacing-xsmall);
+  min-inline-size: 0;
+}
+
 /* (teacher console styles live in src/teacher.css) */
