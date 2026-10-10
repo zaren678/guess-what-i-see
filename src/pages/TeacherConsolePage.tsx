@@ -142,16 +142,6 @@ export function TeacherConsolePage() {
 
       <main className="tcon-main">
         <section className="tcon-card tcon-clue" aria-label="Current clue">
-          <div
-            className={`tcon-turn tcon-turn--${state.currentTeam.toLowerCase()}`}>
-            <span>Team {state.currentTeam} describes</span>
-            <button
-              type="button"
-              className="tcon-turn__switch"
-              onClick={() => go({type: 'switchTeam'})}>
-              Switch team
-            </button>
-          </div>
           {phase === 'starting' && deck ? (
             <>
               <div className="tcon-eyebrow">Starting</div>
@@ -188,12 +178,10 @@ export function TeacherConsolePage() {
             <>
               <div className="tcon-eyebrow">Round over</div>
               <div className="tcon-word tcon-word--small">
-                {state.scoreA === state.scoreB
-                  ? "It's a tie"
-                  : `Team ${state.scoreA > state.scoreB ? 'A' : 'B'} wins`}
+                {state.score} correct!
               </div>
               <div className="tcon-meta">
-                Final — Team A {state.scoreA} · Team B {state.scoreB}
+                Pass the glasses to the next describer for another round.
               </div>
             </>
           ) : (
@@ -242,33 +230,24 @@ export function TeacherConsolePage() {
           </section>
 
           <section className="tcon-card tcon-score" aria-label="Scoreboard">
-            <div className="tcon-eyebrow">Scoreboard</div>
-            {(['A', 'B'] as const).map(team => (
-              <div
-                className={`tcon-team ${team === state.currentTeam ? 'tcon-team--active' : ''}`}
-                key={team}>
-                <span className="tcon-team__name">Team {team}</span>
-                <strong className="tcon-team__score">
-                  {team === 'A' ? state.scoreA : state.scoreB}
-                </strong>
-                <span className="tcon-stepper">
-                  <button
-                    type="button"
-                    aria-label={`Team ${team} +1`}
-                    onClick={() => go({type: team === 'A' ? 'pointA' : 'pointB'})}>
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Team ${team} −1`}
-                    onClick={() =>
-                      go({type: team === 'A' ? 'unpointA' : 'unpointB'})
-                    }>
-                    −
-                  </button>
-                </span>
-              </div>
-            ))}
+            <div className="tcon-eyebrow">Score</div>
+            <div className="tcon-team tcon-team--active">
+              <strong className="tcon-team__score">{state.score}</strong>
+              <span className="tcon-stepper">
+                <button
+                  type="button"
+                  aria-label="Score +1"
+                  onClick={() => go({type: 'scoreUp'})}>
+                  +
+                </button>
+                <button
+                  type="button"
+                  aria-label="Score −1"
+                  onClick={() => go({type: 'scoreDown'})}>
+                  −
+                </button>
+              </span>
+            </div>
           </section>
         </aside>
       </main>
