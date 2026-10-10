@@ -89,13 +89,9 @@ export function TeacherProjectorPage() {
               <TextView as="p" textStyle={TextStyle.META1_EMPHASIZED}>
                 {formatCountdown(state.remainingSeconds)}
               </TextView>
-              <Eyebrow>TEAM A</Eyebrow>
+              <Eyebrow>SCORE</Eyebrow>
               <TextView as="p" textStyle={TextStyle.META1_EMPHASIZED}>
-                {state.scoreA}
-              </TextView>
-              <Eyebrow>TEAM B</Eyebrow>
-              <TextView as="p" textStyle={TextStyle.META1_EMPHASIZED}>
-                {state.scoreB}
+                {state.score}
               </TextView>
               <TextView as="p" textStyle={TextStyle.BODY2}>
                 {state.order.length > 0
