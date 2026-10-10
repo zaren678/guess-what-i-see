@@ -20,7 +20,7 @@ test('snapshotOf degrades cleanly with no deck loaded', () => {
   assert.equal(snap.word, null);
   assert.deepEqual(snap.forbiddenWords, []);
   assert.equal(snap.phase, 'idle');
-  assert.equal(snap.scoreA, 0);
+  assert.equal(snap.score, 0);
 });
 
 test('describeGame narrates a full snapshot', () => {
@@ -34,15 +34,13 @@ test('describeGame narrates a full snapshot', () => {
     hint: 'Boat.',
     phase: 'running',
     remainingSeconds: 37,
-    scoreA: 3,
-    scoreB: 2,
-    currentTeam: 'A',
+    score: 3,
   };
   const text = describeGame(snap);
   assert.match(text, /Noah/);
   assert.match(text, /clue 2 of 12/);
   assert.match(text, /ark, flood/);
-  assert.match(text, /Team A 3, Team B 2/);
+  assert.match(text, /Score 3/);
 });
 
 test('ok and problem serialize tool results', () => {
