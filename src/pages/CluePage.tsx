@@ -361,64 +361,67 @@ export function CluePage() {
             )}
 
             {(playing || previewing) && card && (
-              <>
-                {/* One compact status line (team + progress) and a smaller
-                    timer: the word, don't-say words, and hint must all fit
-                    without scrolling, so the header earns two lines total. */}
-                <TextView
-                  as="p"
-                  textStyle={TextStyle.LABEL_EMPHASIZED}
-                  textColor={TextColor.SECONDARY}>
-                  Clue {state.clueIndex + 1} of {state.order.length}
-                </TextView>
-                <TextView
-                  as="p"
-                  textStyle={TextStyle.HEADING2}
-                  textColor={lowTime ? TextColor.ACCENT : TextColor.PRIMARY}>
-                  {formatCountdown(state.remainingSeconds)}
-                </TextView>
-                <SliderBar
-                  minimumValue={0}
-                  maximumValue={ROUND_SECONDS}
-                  value={state.remainingSeconds}
-                  size={SliderBarSize.THIN}
-                  animated
-                />
-                {previewing && (
+              <div className="clue-compact">
+                {/* Tight blocks so the word, don't-say list, and hint all
+                    fit on screen without scrolling. */}
+                <div className="clue-block">
                   <TextView
                     as="p"
                     textStyle={TextStyle.LABEL_EMPHASIZED}
-                    textColor={TextColor.ACCENT}>
-                    Get ready — starting soon…
+                    textColor={TextColor.SECONDARY}>
+                    Clue {state.clueIndex + 1} of {state.order.length}
                   </TextView>
-                )}
-                <Eyebrow>{card.category}</Eyebrow>
-                <TextView as="p" textStyle={TextStyle.HEADING1}>
-                  {card.word}
-                </TextView>
+                  <TextView
+                    as="p"
+                    textStyle={TextStyle.HEADING2}
+                    textColor={lowTime ? TextColor.ACCENT : TextColor.PRIMARY}>
+                    {formatCountdown(state.remainingSeconds)}
+                  </TextView>
+                  <SliderBar
+                    minimumValue={0}
+                    maximumValue={ROUND_SECONDS}
+                    value={state.remainingSeconds}
+                    size={SliderBarSize.THIN}
+                    animated
+                  />
+                  {previewing && (
+                    <TextView
+                      as="p"
+                      textStyle={TextStyle.LABEL_EMPHASIZED}
+                      textColor={TextColor.ACCENT}>
+                      Get ready — starting soon…
+                    </TextView>
+                  )}
+                  {phase === 'paused' && (
+                    <TextView as="p" textStyle={TextStyle.BODY2}>
+                      Paused — waiting for teacher…
+                    </TextView>
+                  )}
+                </div>
+                <div className="clue-block">
+                  <Eyebrow>{card.category}</Eyebrow>
+                  <TextView as="p" textStyle={TextStyle.HEADING1}>
+                    {card.word}
+                  </TextView>
+                </div>
                 {card.forbiddenWords.length > 0 && (
-                  <>
+                  <div className="clue-block">
                     <Eyebrow>Don't say</Eyebrow>
                     <TextView as="p" textStyle={TextStyle.BODY2}>
                       {card.forbiddenWords.join(', ')}
                     </TextView>
-                  </>
+                  </div>
                 )}
                 {card.hint && (
-                  <>
+                  <div className="clue-block">
                     <Eyebrow>Hint</Eyebrow>
                     <TextView as="p" textStyle={TextStyle.BODY2}>
                       {card.hint}
                     </TextView>
-                  </>
-                )}
-                {phase === 'paused' && (
-                  <TextView as="p" textStyle={TextStyle.BODY2}>
-                    Paused — waiting for teacher…
-                  </TextView>
+                  </div>
                 )}
                 <LinkBadge connected={connected} />
-              </>
+              </div>
             )}
 
             {phase === 'complete' && (
