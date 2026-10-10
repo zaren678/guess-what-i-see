@@ -40,7 +40,7 @@ test('describeGame narrates a full snapshot', () => {
   assert.match(text, /Noah/);
   assert.match(text, /clue 2 of 12/);
   assert.match(text, /ark, flood/);
-  assert.match(text, /Score 3/);
+  assert.match(text, /Shared score 3/);
 });
 
 test('ok and problem serialize tool results', () => {
