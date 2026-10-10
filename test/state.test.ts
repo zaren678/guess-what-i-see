@@ -22,14 +22,13 @@ function running(overrides: Partial<GameState> = {}): GameState {
 
 test('SELECT_DECK loads the deck and resets the round', () => {
   const next = gameReducer(
-    {...initialGameState, scoreA: 3, currentTeam: 'B'},
+    {...initialGameState, score: 3},
     {type: 'SELECT_DECK', deckId: 'heroes', order: [1, 0]},
   );
   assert.equal(next.deckId, 'heroes');
   assert.deepEqual(next.order, [1, 0]);
   assert.equal(next.phase, 'idle');
-  assert.equal(next.scoreA, 0);
-  assert.equal(next.currentTeam, 'A');
+  assert.equal(next.score, 0);
 });
 
 test('START_ROUND needs a non-empty incoming order', () => {
@@ -111,12 +110,11 @@ test('SET_ACKED echoes the nonce; RESET clears handshake ids', () => {
   assert.equal(reset.ackedId, '');
 });
 
-test('CORRECT scores the describing team and advances', () => {
-  const next = gameReducer(running({currentTeam: 'B', clueIndex: 0}), {
+test('CORRECT bumps the shared score and advances', () => {
+  const next = gameReducer(running({clueIndex: 0}), {
     type: 'CORRECT',
   });
-  assert.equal(next.scoreB, 1);
-  assert.equal(next.scoreA, 0);
+  assert.equal(next.score, 1);
   assert.equal(next.clueIndex, 1);
 
   const idle = gameReducer(initialGameState, {type: 'CORRECT'});
@@ -129,7 +127,7 @@ test('SKIP advances only while running, wrapping at the end', () => {
 
   const paused = gameReducer(running({phase: 'paused'}), {type: 'SKIP'});
   assert.equal(paused.clueIndex, 0);
-  assert.equal(paused.scoreA, 0);
+  assert.equal(paused.score, 0);
 });
 
 test('GOTO wraps positive and negative indices', () => {
@@ -160,27 +158,24 @@ test('END_ROUND / RESET_ROUND lifecycle', () => {
   assert.strictEqual(gameReducer(initialGameState, {type: 'END_ROUND'}), initialGameState);
 
   const reset = gameReducer(
-    {...running(), phase: 'complete', scoreA: 4, currentTeam: 'B', revealed: true},
+    {...running(), phase: 'complete', score: 4, revealed: true},
     {type: 'RESET_ROUND'},
   );
   assert.equal(reset.phase, 'idle');
-  assert.equal(reset.scoreA, 0);
-  assert.equal(reset.currentTeam, 'A');
+  assert.equal(reset.score, 0);
   assert.equal(reset.revealed, false);
   assert.equal(reset.remainingSeconds, ROUND_SECONDS);
 });
 
-test('POINT clamps at zero; SWITCH_TEAM toggles; SET_REVEALED sets', () => {
+test('ADJUST_SCORE clamps at zero; SET_REVEALED sets', () => {
   const s = running();
-  assert.equal(gameReducer(s, {type: 'POINT', team: 'A', delta: 1}).scoreA, 1);
-  assert.equal(gameReducer(s, {type: 'POINT', team: 'A', delta: -1}).scoreA, 0);
-  assert.equal(gameReducer(s, {type: 'POINT', team: 'B', delta: -1}).scoreB, 0);
-  assert.equal(gameReducer(s, {type: 'SWITCH_TEAM'}).currentTeam, 'B');
+  assert.equal(gameReducer(s, {type: 'ADJUST_SCORE', delta: 1}).score, 1);
+  assert.equal(gameReducer(s, {type: 'ADJUST_SCORE', delta: -1}).score, 0);
   assert.equal(gameReducer(s, {type: 'SET_REVEALED', revealed: true}).revealed, true);
 });
 
 test('APPLY_STATE replaces wholesale', () => {
-  const custom = running({scoreA: 9});
+  const custom = running({score: 9});
   assert.strictEqual(gameReducer(initialGameState, {type: 'APPLY_STATE', state: custom}), custom);
 });
 
@@ -194,7 +189,6 @@ test('isGameState accepts good snapshots and rejects junk', () => {
     'state',
     {},
     {...running(), phase: 'overtime'},
-    {...running(), currentTeam: 'C'},
     {...running(), deckId: 5},
     {...running(), order: [0, -1]},
     {...running(), order: [0, 1.5]},
@@ -202,7 +196,7 @@ test('isGameState accepts good snapshots and rejects junk', () => {
     {...running(), startId: 5},
     {...running(), ackedId: null},
     {...running(), remainingSeconds: NaN},
-    {...running(), scoreA: Infinity},
+    {...running(), score: Infinity},
     {...running(), revealed: 'yes'},
   ]) {
     assert.equal(isGameState(bad), false);
@@ -213,7 +207,7 @@ test('isTickOnly spots the 1-second clock and nothing else', () => {
   const prev = running({remainingSeconds: 30});
   assert.equal(isTickOnly(prev, {...prev, remainingSeconds: 29}), true);
   assert.equal(isTickOnly(prev, {...prev, remainingSeconds: 28}), false);
-  assert.equal(isTickOnly(prev, {...prev, scoreA: 1, remainingSeconds: 29}), false);
+  assert.equal(isTickOnly(prev, {...prev, score: 1, remainingSeconds: 29}), false);
   assert.equal(
     isTickOnly(prev, {...prev, phase: 'paused', remainingSeconds: 29}),
     false,
