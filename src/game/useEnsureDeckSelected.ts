@@ -10,9 +10,9 @@ export function useEnsureDeckSelected(deckId: string | undefined) {
   useEffect(() => {
     if (!deckId || state.deckId === deckId) return;
     const quiescent =
-      state.phase === 'idle' || (state.scoreA === 0 && state.scoreB === 0);
+      state.phase === 'idle' || state.score === 0;
     if (quiescent) {
       mutate({type: 'selectDeck', deckId});
     }
-  }, [deckId, state.deckId, state.phase, state.scoreA, state.scoreB, mutate]);
+  }, [deckId, state.deckId, state.phase, state.score, mutate]);
 }
