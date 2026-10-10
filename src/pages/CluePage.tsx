@@ -46,9 +46,7 @@ const VOICE_TOOLS: VoiceTool[] = [
     action: {type: 'correct'},
     needsRunning: true,
     result: snapshot => ({
-      awardedTo: `Team ${snapshot.currentTeam}`,
-      scoreA: snapshot.scoreA,
-      scoreB: snapshot.scoreB,
+      score: snapshot.score,
       nextWord: snapshot.word,
       clueNumber: snapshot.clueNumber,
     }),
@@ -214,11 +212,6 @@ const HURRY_SECONDS = 10;
 /** How long a celebration banner stays up (roughly one sync cycle). */
 const FLASH_MS = 2600;
 
-function winnerOf(scoreA: number, scoreB: number): 'A' | 'B' | null {
-  if (scoreA === scoreB) return null;
-  return scoreA > scoreB ? 'A' : 'B';
-}
-
 /**
  * Glasses `/`: a pure display for the describer. The teacher drives
  * everything from the laptop; this screen shows the countdown, the secret
@@ -235,7 +228,7 @@ export function CluePage() {
   // Celebration state: a transient banner plus a consecutive-got-it streak.
   // Both derive from synced snapshot transitions, so missed polls degrade
   // gracefully (a +2 jump still flashes once with the right delta).
-  const total = state.scoreA + state.scoreB;
+  const total = state.score;
   const [flash, setFlash] = useState<Flash>(null);
   const [streak, setStreak] = useState(0);
   const prevRef = useRef({clueIndex: state.clueIndex, total, phase: state.phase});
@@ -258,10 +251,7 @@ export function CluePage() {
       const delta = total - prev.total;
       setStreak(s => s + delta);
       setFlash({
-        text:
-          delta === 1
-            ? `Got it! +1 for Team ${state.currentTeam}`
-            : `+${delta} for Team ${state.currentTeam} — way to go!`,
+        text: delta === 1 ? 'Got it! +1' : `+${delta} — way to go!`,
       });
     } else if (state.phase === 'running' && state.order.length > 0) {
       // Only a forward step counts as a skip -- the teacher's Prev/Next
@@ -274,7 +264,7 @@ export function CluePage() {
       }
     }
     prevRef.current = {clueIndex: state.clueIndex, total, phase: state.phase};
-  }, [state.clueIndex, state.phase, state.currentTeam, state.order.length, total]);
+  }, [state.clueIndex, state.phase, state.order.length, total]);
 
   // Celebration banners clear after one sync cycle.
   useEffect(() => {
@@ -308,7 +298,6 @@ export function CluePage() {
   const playing = phase === 'running' || phase === 'paused';
   const previewing = phase === 'starting';
   const lowTime = state.remainingSeconds <= HURRY_SECONDS;
-  const winner = winnerOf(state.scoreA, state.scoreB);
 
   // Transient accent lines go out as toasts instead of inline rows, so the
   // word and don't-say list never scroll off for a one-shot celebration.
@@ -380,8 +369,7 @@ export function CluePage() {
                   as="p"
                   textStyle={TextStyle.LABEL_EMPHASIZED}
                   textColor={TextColor.SECONDARY}>
-                  Team {state.currentTeam} describes · Clue {state.clueIndex + 1}{' '}
-                  of {state.order.length}
+                  Clue {state.clueIndex + 1} of {state.order.length}
                 </TextView>
                 <TextView
                   as="p"
@@ -436,10 +424,10 @@ export function CluePage() {
             {phase === 'complete' && (
               <>
                 <TextView as="h2" textStyle={TextStyle.HEADING2}>
-                  {winner ? `Team ${winner} wins!` : `It's a tie!`}
+                  Round over!
                 </TextView>
                 <TextView as="p" textStyle={TextStyle.BODY2}>
-                  Team A {state.scoreA} · Team B {state.scoreB}
+                  {state.score} correct — great describing!
                 </TextView>
                 <LinkBadge connected={connected} />
               </>
