@@ -7,8 +7,6 @@ export type RoundPhase =
   | 'running'
   | 'paused'
   | 'complete';
-export type Team = 'A' | 'B';
-
 export type GameState = {
   deckId: string | null;
   /** Shuffled card indices for the current round. */
@@ -17,9 +15,8 @@ export type GameState = {
   clueIndex: number;
   phase: RoundPhase;
   remainingSeconds: number;
-  scoreA: number;
-  scoreB: number;
-  currentTeam: Team;
+  /** Shared score: no teams, the class plays together. */
+  score: number;
   /** Teacher-side reveal of the secret word. */
   revealed: boolean;
   /**
@@ -55,11 +52,8 @@ export function isGameState(value: unknown): value is GameState {
       s.phase === 'complete') &&
     typeof s.remainingSeconds === 'number' &&
     Number.isFinite(s.remainingSeconds) &&
-    typeof s.scoreA === 'number' &&
-    Number.isFinite(s.scoreA) &&
-    typeof s.scoreB === 'number' &&
-    Number.isFinite(s.scoreB) &&
-    (s.currentTeam === 'A' || s.currentTeam === 'B') &&
+    typeof s.score === 'number' &&
+    Number.isFinite(s.score) &&
     typeof s.revealed === 'boolean' &&
     typeof s.startId === 'string' &&
     typeof s.ackedId === 'string'
@@ -76,9 +70,7 @@ export function isTickOnly(prev: GameState, next: GameState): boolean {
     next.remainingSeconds === prev.remainingSeconds - 1 &&
     prev.deckId === next.deckId &&
     prev.clueIndex === next.clueIndex &&
-    prev.scoreA === next.scoreA &&
-    prev.scoreB === next.scoreB &&
-    prev.currentTeam === next.currentTeam &&
+    prev.score === next.score &&
     prev.revealed === next.revealed &&
     prev.order === next.order
   );
@@ -90,9 +82,7 @@ export const initialGameState: GameState = {
   clueIndex: 0,
   phase: 'idle',
   remainingSeconds: ROUND_SECONDS,
-  scoreA: 0,
-  scoreB: 0,
-  currentTeam: 'A',
+  score: 0,
   revealed: false,
   startId: '',
   ackedId: '',
@@ -111,8 +101,7 @@ export type GameAction =
   | {type: 'END_ROUND'}
   | {type: 'RESET_ROUND'}
   | {type: 'TICK'}
-  | {type: 'POINT'; team: Team; delta: 1 | -1}
-  | {type: 'SWITCH_TEAM'}
+  | {type: 'ADJUST_SCORE'; delta: 1 | -1}
   | {type: 'SET_REVEALED'; revealed: boolean}
   | {type: 'APPLY_STATE'; state: GameState};
 
@@ -181,11 +170,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CORRECT': {
       if (state.phase !== 'running' || state.order.length === 0) return state;
       const next = advance(state);
-      return {
-        ...next,
-        scoreA: state.scoreA + (state.currentTeam === 'A' ? 1 : 0),
-        scoreB: state.scoreB + (state.currentTeam === 'B' ? 1 : 0),
-      };
+      return {...next, score: state.score + 1};
     }
     case 'SKIP':
       return state.phase === 'running' ? advance(state) : state;
@@ -206,9 +191,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase: 'idle',
         remainingSeconds: ROUND_SECONDS,
         clueIndex: 0,
-        scoreA: 0,
-        scoreB: 0,
-        currentTeam: 'A',
+        score: 0,
         revealed: false,
         startId: '',
         ackedId: '',
@@ -221,17 +204,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       return {...state, remainingSeconds: remaining};
     }
-    case 'POINT':
-      if (action.delta === 1) {
-        return action.team === 'A'
-          ? {...state, scoreA: state.scoreA + 1}
-          : {...state, scoreB: state.scoreB + 1};
-      }
-      return action.team === 'A'
-        ? {...state, scoreA: Math.max(0, state.scoreA - 1)}
-        : {...state, scoreB: Math.max(0, state.scoreB - 1)};
-    case 'SWITCH_TEAM':
-      return {...state, currentTeam: state.currentTeam === 'A' ? 'B' : 'A'};
+    case 'ADJUST_SCORE':
+      return {...state, score: Math.max(0, state.score + action.delta)};
     case 'SET_REVEALED':
       return {...state, revealed: action.revealed};
     case 'APPLY_STATE':
