@@ -51,14 +51,17 @@ export function TeacherConsolePage() {
       : phase === 'paused'
         ? {type: 'resume'}
         : {type: 'start'};
-  // While starting, Start means "begin now" (the fallback when the
-  // glasses never acked).
+  // While starting, Start begins the round: "Start timer" once the
+  // glasses confirmed, "Begin now" as the fallback when they never acked.
+  const acked = state.startId !== '' && state.ackedId === state.startId;
   const startPauseLabel = running
     ? 'Pause'
     : phase === 'paused'
       ? 'Resume'
       : phase === 'starting'
-        ? 'Begin now'
+        ? acked
+          ? 'Start timer'
+          : 'Begin now'
         : 'Start';
 
   // Keyboard driving: G = got it, S = skip, Space = start/pause/resume,
@@ -145,13 +148,26 @@ export function TeacherConsolePage() {
           {phase === 'starting' && deck ? (
             <>
               <div className="tcon-eyebrow">Starting</div>
-              <div className="tcon-word tcon-word--small">
-                Waiting for glasses…
-              </div>
-              <div className="tcon-meta">
-                The clock starts when the glasses confirm the word is on
-                screen. Press Begin now (Space) to start without waiting.
-              </div>
+              {acked ? (
+                <>
+                  <div className="tcon-word tcon-word--small">Ready</div>
+                  <div className="tcon-meta">
+                    The word is on the glasses. Press Start timer (Space)
+                    when the describer is ready — the clock only runs
+                    after that.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="tcon-word tcon-word--small">
+                    Waiting for glasses…
+                  </div>
+                  <div className="tcon-meta">
+                    The word appears on the glasses first. Press Begin now
+                    (Space) to skip waiting and start without them.
+                  </div>
+                </>
+              )}
             </>
           ) : playing && card ? (
             <>
