@@ -148,24 +148,34 @@ export function TeacherConsolePage() {
           {phase === 'starting' && deck ? (
             <>
               <div className="tcon-eyebrow">Starting</div>
-              {acked ? (
+              <div className="tcon-word tcon-word--small">
+                {acked ? 'Ready' : 'Waiting for glasses…'}
+              </div>
+              <div className="tcon-meta">
+                {acked
+                  ? 'The word is on the glasses. Press Start timer (Space) when the describer is ready — the clock only runs after that.'
+                  : 'The word appears on the glasses first. Press Begin now (Space) to skip waiting and start without them.'}
+              </div>
+              {card && (
                 <>
-                  <div className="tcon-word tcon-word--small">Ready</div>
+                  <div className="tcon-eyebrow">Up next</div>
+                  <div className="tcon-word">{card.word}</div>
                   <div className="tcon-meta">
-                    The word is on the glasses. Press Start timer (Space)
-                    when the describer is ready — the clock only runs
-                    after that.
+                    {card.category} · Clue {state.clueIndex + 1} of{' '}
+                    {state.order.length}
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="tcon-word tcon-word--small">
-                    Waiting for glasses…
-                  </div>
-                  <div className="tcon-meta">
-                    The word appears on the glasses first. Press Begin now
-                    (Space) to skip waiting and start without them.
-                  </div>
+                  <dl className="tcon-facts">
+                    <div>
+                      <dt>Don't say</dt>
+                      <dd>{card.forbiddenWords.join(', ')}</dd>
+                    </div>
+                    {card.hint && (
+                      <div>
+                        <dt>Hint</dt>
+                        <dd>{card.hint}</dd>
+                      </div>
+                    )}
+                  </dl>
                 </>
               )}
             </>
