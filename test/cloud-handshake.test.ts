@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 
 /**
  * Handshake tests for the start protocol in src/game/cloud.ts: the glasses
- * echoes an unacked start nonce exactly once, and the teacher begins the
- * clock exactly once when the echo arrives. Both flows run through the real
- * poll/adopt path with a scripted server, so these pin the no-double-post
- * invariant, not just the reducer.
+ * echoes an unacked start nonce exactly once, and the teacher holds the
+ * clock in `starting` after the echo until beginning by hand. Both flows
+ * run through the real poll/adopt path with a scripted server, so these
+ * pin the no-double-post invariant, not just the reducer.
  */
 
 type Timer = {id: number; fn: () => void; ms: number};
@@ -80,7 +80,7 @@ function postedState(call: {body: string}) {
 
 // Imports hoist above the stubs; attachCloud runs in before(), after setup.
 import {attachCloud} from '../src/game/cloud';
-import {dispatchGame} from '../src/game/store';
+import {dispatchGame, getGameState} from '../src/game/store';
 import {
   initialGameState,
   isGameState,
@@ -153,7 +153,7 @@ test('glasses stays quiet once the start is acked', async () => {
   assert.equal(postsSince(n).length, 0);
 });
 
-test('teacher waits for the echo, then begins exactly once', async () => {
+test('teacher holds in starting after the echo; the timer waits for the teacher', async () => {
   attachCloud({role: 'teacher', onRemoteState: applyRemote});
 
   const at = base + 3000;
@@ -183,6 +183,15 @@ test('teacher waits for the echo, then begins exactly once', async () => {
   n = fetchCalls.length;
   await runPoll();
 
+  // The echo arrives: the teacher adopts it, but the clock stays held —
+  // nothing new to broadcast, and no auto-begin.
+  assert.equal(postsSince(n).length, 0);
+  assert.equal(getGameState().phase, 'starting');
+  assert.equal(getGameState().ackedId, 'n2');
+
+  // The teacher's own begin is what starts the clock, exactly once.
+  dispatchGame({type: 'BEGIN_ROUND'});
+  await flush();
   const posts = postsSince(n);
   assert.equal(posts.length, 1);
   const state = postedState(posts[0]);
