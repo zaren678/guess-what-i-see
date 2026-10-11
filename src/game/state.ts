@@ -119,8 +119,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         order: action.order,
       };    case 'START_ROUND': {
       if (action.order.length === 0) return state;
-      // Pressing Start while starting begins immediately (the fallback when
-      // the glasses never acked).
+      // Pressing Start while starting begins the round immediately: the
+      // "Start timer" gate, and the fallback when the glasses never acked.
       if (state.phase === 'starting') {
         return {
           ...state,
@@ -129,20 +129,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           remainingSeconds: ROUND_SECONDS,
         };
       }
-      // Mid-game restarts skip the handshake and run at once.
-      if (state.phase !== 'idle') {
-        return {
-          ...state,
-          order: action.order,
-          clueIndex: 0,
-          phase: 'running',
-          remainingSeconds: ROUND_SECONDS,
-          startId: action.startId,
-          ackedId: action.startId,
-        };
-      }
-      // Fresh start: hold the clock in `starting` until the glasses echoes
-      // the nonce back. The timer only ever ticks while running.
+      // Hold the clock in `starting` until the teacher starts the timer.
+      // The glasses echoes the start nonce once the word is on screen;
+      // the timer only ever ticks while running, so setup time never
+      // burns the clock.
       return {
         ...state,
         order: action.order,
