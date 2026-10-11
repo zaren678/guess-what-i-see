@@ -96,6 +96,13 @@ const VOICE_TOOLS: VoiceTool[] = [
     action: {type: 'start'},
     needsRunning: false,
     result: snapshot => {
+      if (snapshot.phase === 'starting') {
+        return {
+          phase: snapshot.phase,
+          note: 'The word is ready. Say "start the round" again to start the timer.',
+          firstWord: snapshot.word,
+        };
+      }
       if (snapshot.phase !== 'running') {
         return {
           error: true,
