@@ -51,6 +51,7 @@ export function TeacherProjectorPage() {
   const card =
     state.order.length > 0 ? deck.cards[state.order[state.clueIndex]] : undefined;
   const phase = state.phase;
+  const acked = state.startId !== '' && state.ackedId === state.startId;
 
   const announce = (action: PublicAction, message: string) => {
     mutate(action);
@@ -65,7 +66,11 @@ export function TeacherProjectorPage() {
         : phase === 'complete'
           ? {title: 'Play again', action: {type: 'start'}, toast: 'Round started'}
           : phase === 'starting'
-            ? {title: 'Begin now', action: {type: 'start'}, toast: 'Round started'}
+            ? {
+                title: acked ? 'Start timer' : 'Begin now',
+                action: {type: 'start'},
+                toast: 'Round started',
+              }
             : {title: 'Start round', action: {type: 'start'}, toast: 'Round started'};
 
   return (
