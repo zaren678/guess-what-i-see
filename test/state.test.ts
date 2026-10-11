@@ -70,7 +70,7 @@ test('START_ROUND holds the clock in starting until begin', () => {
   assert.strictEqual(gameReducer(runningState, {type: 'BEGIN_ROUND'}), runningState);
 });
 
-test('START_ROUND while starting begins at once; mid-game restarts run', () => {
+test('START_ROUND while starting begins at once; restarts hold for the timer gate', () => {
   const starting = gameReducer(initialGameState, {
     type: 'START_ROUND',
     order: [0, 1],
@@ -84,15 +84,17 @@ test('START_ROUND while starting begins at once; mid-game restarts run', () => {
   assert.equal(begun.phase, 'running');
   assert.deepEqual(begun.order, [0, 1]);
 
+  // Mid-game restarts also wait in `starting`: the clock only runs after
+  // the teacher starts the timer, so setup time never burns it.
   const restart = gameReducer(running({order: [0]}), {
     type: 'START_ROUND',
     order: [1, 0],
     startId: 'n3',
   });
-  assert.equal(restart.phase, 'running');
+  assert.equal(restart.phase, 'starting');
   assert.deepEqual(restart.order, [1, 0]);
   assert.equal(restart.startId, 'n3');
-  assert.equal(restart.ackedId, 'n3');
+  assert.equal(restart.ackedId, '');
 });
 
 test('SET_ACKED echoes the nonce; RESET clears handshake ids', () => {
